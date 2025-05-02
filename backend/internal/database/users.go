@@ -77,6 +77,53 @@ func UserExists(db *sql.DB, userID int) (bool, error) {
     return exists, err
 }
 
+func GetUserAnswersRaw(db *sql.DB, userID, surveyID int) (*sql.Rows, error) {
+    query := `
+        SELECT 
+            q.id,
+            q.question_text, 
+            q.answers, 
+            q.correct_answer, 
+            q.is_test,
+            au.answer_id, 
+            au.answer_user 
+        FROM answers_users au
+        JOIN questions q ON au.question_id = q.id
+        WHERE au.user_id = $1 AND q.survey_id = $2`
+    
+    return db.Query(query, userID, surveyID)
+}
+
+func SaveUserResult(db *sql.DB, surveyID, userID, totalBall int) error {
+    _, err := db.Exec(
+        `INSERT INTO results (survey_id, user_id, total_ball) 
+        VALUES ($1, $2, $3)
+        ON CONFLICT (survey_id, user_id) 
+        DO UPDATE SET total_ball = $3, date = NOW()`,
+        surveyID, userID, totalBall,
+    )
+    return err
+}
+
+func DeleteUserAnswers(db *sql.DB, userID, surveyID int) error {
+    _, err := db.Exec(
+        `DELETE FROM answers_users 
+        WHERE user_id = $1 AND question_id IN (
+            SELECT id FROM questions WHERE survey_id = $2
+        )`,
+        userID, surveyID,
+    )
+    return err
+}
+
+func DeleteUserResult(db *sql.DB, userID, surveyID int) error {
+    _, err := db.Exec(
+        "DELETE FROM results WHERE user_id = $1 AND survey_id = $2",
+        userID, surveyID,
+    )
+    return err
+}
+
 // Для результатов пользователя
 func GetUserResults(db *sql.DB, userID int) ([]models.Result, error) {
     query := `
@@ -106,7 +153,6 @@ func GetUserResults(db *sql.DB, userID int) ([]models.Result, error) {
     }
     return results, nil
 }
-
 
 // UserExistsRaw проверяет существование пользователя без учета deleted_at
 func UserExistsRaw(db *sql.DB, userID int) (bool, error) {

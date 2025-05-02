@@ -6,7 +6,6 @@ import (
     "errors"
     "my-auth-app/internal/models"
 )
-
 func CreateSurvey(db *sql.DB, survey *models.Survey) error {
     err := db.QueryRow(
       `INSERT INTO surveys 
@@ -71,34 +70,119 @@ func UpdateSurvey(db *sql.DB, surveyID int, title, description string) error {
     return err
 }
 
-func GetSurveyResults(db *sql.DB, surveyID int, ownerID int) ([]models.ExtendedResult, error) {
+func GetSurveysByCreator(db *sql.DB, userID int) ([]models.Survey, error) {
     query := `
-        SELECT r.id, r.user_id, r.date, r.total_ball, u.username
-        FROM results r
-        JOIN users u ON r.user_id = u.id
-        WHERE r.survey_id = $1 AND EXISTS (
-            SELECT 1 FROM surveys WHERE id = $1 AND created_by = $2
-        )
-        ORDER BY r.date DESC`
-
-    rows, err := db.Query(query, surveyID, ownerID)
+        SELECT id, title, description, is_private, created_by, created_at 
+        FROM surveys 
+        WHERE created_by = $1
+        ORDER BY created_at DESC
+    `
+    
+    rows, err := db.Query(query, userID)
     if err != nil {
-        return nil, fmt.Errorf("ошибка выполнения запроса: %v", err)
+        return nil, err
     }
     defer rows.Close()
 
-    var results []models.ExtendedResult
+    var surveys []models.Survey
     for rows.Next() {
-        var er models.ExtendedResult
-        if err := rows.Scan(&er.ID, &er.UserID, &er.Date, &er.TotalBall, &er.Username); err != nil {
-            return nil, fmt.Errorf("ошибка сканирования результата: %v", err)
+        var s models.Survey
+        err := rows.Scan(
+            &s.ID,
+            &s.Title,
+            &s.Description,
+            &s.IsPrivate,
+            &s.CreatedBy,
+            &s.CreatedAt,
+        )
+        if err != nil {
+            return nil, err
         }
-        er.SurveyID = surveyID
-        results = append(results, er)
+        surveys = append(surveys, s)
     }
+    
+    return surveys, nil
+}
 
-    if len(results) == 0 {
-        return nil, sql.ErrNoRows
+
+func GetSurveyResults(db *sql.DB, surveyID int, userID int) (*models.SurveyResult, error) {
+    var result models.SurveyResult
+    
+    // Запрос с объединением таблиц results и surveys
+    err := db.QueryRow(`
+        SELECT r.total_ball, s.max_ball, r.date 
+        FROM results r
+        JOIN surveys s ON r.survey_id = s.id
+        WHERE r.survey_id = $1 AND r.user_id = $2
+    `, surveyID, userID).Scan(
+        &result.TotalScore,
+        &result.MaxScore,
+        &result.Date,
+    )
+
+    if err != nil {
+        return nil, err
     }
-    return results, nil
+    
+    return &result, nil
+}
+
+func UpdateSurveyMaxBall(db Executor, surveyID int, ball int) error {
+	_, err := db.Exec(
+		"UPDATE surveys SET max_ball = max_ball + $1 WHERE id = $2",
+		ball,
+		surveyID,
+	)
+	if err != nil {
+		return fmt.Errorf("ошибка обновления max_ball: %v", err)
+	}
+	return nil
+}
+
+func GetSurveyParticipants(db *sql.DB, surveyID int) ([]models.ParticipantResult, error) {
+    query := `
+        SELECT 
+            u.id,
+            u.username,
+            r.total_ball,
+            r.date,
+            s.max_ball
+        FROM results r
+        JOIN users u ON r.user_id = u.id
+        JOIN surveys s ON r.survey_id = s.id
+        WHERE r.survey_id = $1
+        ORDER BY r.date DESC
+    `
+    
+    rows, err := db.Query(query, surveyID)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var participants []models.ParticipantResult
+    for rows.Next() {
+        var p models.ParticipantResult
+        err := rows.Scan(
+            &p.UserID,
+            &p.Username,
+            &p.TotalBall,
+            &p.Date,
+            &p.MaxScore,
+        )
+        if err != nil {
+            return nil, err
+        }
+        participants = append(participants, p)
+    }
+    
+    return participants, nil
+}
+
+
+
+
+type Executor interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	QueryRow(query string, args ...interface{}) *sql.Row
 }

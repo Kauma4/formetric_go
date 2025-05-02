@@ -1,7 +1,7 @@
 package handlers
 
 import (
-    "errors"
+   // "errors"
     "bytes"
     "database/sql"
     "io"
@@ -14,79 +14,103 @@ import (
 )
 
 func createQuestion(db *sql.DB) gin.HandlerFunc {
-    return func(c *gin.Context) {
-        rawBody, _ := c.GetRawData()
-        log.Printf("Raw request body: %s", string(rawBody))
-        c.Request.Body = io.NopCloser(bytes.NewBuffer(rawBody))
+	return func(c *gin.Context) {
+		rawBody, _ := c.GetRawData()
+		log.Printf("Raw request body: %s", string(rawBody))
+		c.Request.Body = io.NopCloser(bytes.NewBuffer(rawBody))
 
-        var question models.Question
-        if err := c.ShouldBindJSON(&question); err != nil {
-            log.Printf("JSON bind error: %v", err)
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный запрос: " + err.Error()})
-            return
-        }
+		var question models.Question
+		if err := c.ShouldBindJSON(&question); err != nil {
+			log.Printf("JSON bind error: %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный запрос: " + err.Error()})
+			return
+		}
 
-        if question.QuestionText == "" {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Текст вопроса не может быть пустым"})
-            return
-        }
+		if question.QuestionText == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Текст вопроса не может быть пустым"})
+			return
+		}
 
-        userID, err := getUserIDFromToken(c)
-        if err != nil {
-            log.Printf("Auth error: %v", err)
-            c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
-            return
-        }
+		userID, err := getUserIDFromToken(c)
+		if err != nil {
+			log.Printf("Auth error: %v", err)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			return
+		}
 
-        surveyOwnerID, err := database.GetSurveyOwnerID(db, question.SurveyID)
-        if err != nil {
-            log.Printf("Survey owner check error: %v", err)
-            c.JSON(http.StatusBadRequest, gin.H{
-                "error": "Ошибка проверки опроса",
-                "details": err.Error(),
-            })
-            return
-        }
-        
-        if surveyOwnerID != userID {
-            c.JSON(http.StatusForbidden, gin.H{"error": "Нет прав на добавление вопроса"})
-            return
-        }
+		surveyOwnerID, err := database.GetSurveyOwnerID(db, question.SurveyID)
+		if err != nil {
+			log.Printf("Survey owner check error: %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error":    "Ошибка проверки опроса",
+				"details":  err.Error(),
+			})
+			return
+		}
 
-        if question.IsTest {
-            if len(question.Answers) == 0 {
-                c.JSON(http.StatusBadRequest, gin.H{"error": "Для тестового вопроса нужны варианты ответов"})
-                return
-            }
-            question.CorrectAnswer = ""
-        } else {
-            question.Answers = nil
-        }
+		if surveyOwnerID != userID {
+			c.JSON(http.StatusForbidden, gin.H{"error": "Нет прав на добавление вопроса"})
+			return
+		}
 
-        log.Printf("Creating question: %+v", question)
+		if question.IsTest {
+			if len(question.Answers) == 0 {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Для тестового вопроса нужны варианты ответов"})
+				return
+			}
+			question.CorrectAnswer = ""
+		} else {
+			question.Answers = nil
+		}
 
-        if err := database.CreateQuestion(db, &question); err != nil {
-            log.Printf("DB error: %v", err)
-            c.JSON(http.StatusInternalServerError, gin.H{
-                "error": "Не удалось создать вопрос",
-                "details": err.Error(),
-            })
-            return
-        }
+		// Начало транзакции
+		tx, err := db.Begin()
+		if err != nil {
+			log.Printf("Ошибка начала транзакции: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка сервера"})
+			return
+		}
+		defer func() {
+			if err != nil {
+				tx.Rollback()
+				return
+			}
+			tx.Commit()
+		}()
 
-        log.Printf("Question created: ID=%d, SurveyID=%d", question.ID, question.SurveyID)
-        
-        c.JSON(http.StatusOK, gin.H{
-            "message": "Вопрос успешно создан",
-            "question_id": question.ID,
-            "details": gin.H{
-                "text": question.QuestionText,
-                "ball": question.Ball,
-                "type": question.GetQuestionType(),
-                "is_test": question.IsTest,
-            },
-        })
-    }
+		// Создание вопроса в транзакции
+		if err := database.CreateQuestion(tx, &question); err != nil {
+			log.Printf("DB error: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":    "Не удалось создать вопрос",
+				"details":  err.Error(),
+			})
+			return
+		}
+
+		// Обновление max_ball в транзакции
+		if err := database.UpdateSurveyMaxBall(tx, question.SurveyID, question.Ball); err != nil {
+			log.Printf("Ошибка обновления max_ball: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error":    "Ошибка обновления максимального балла",
+				"details":  err.Error(),
+			})
+			return
+		}
+
+		log.Printf("Question created: ID=%d, SurveyID=%d", question.ID, question.SurveyID)
+		
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Вопрос успешно создан",
+			"question_id": question.ID,
+			"details": gin.H{
+				"text":    question.QuestionText,
+				"ball":    question.Ball,
+				"type":    question.GetQuestionType(),
+				"is_test": question.IsTest,
+			},
+		})
+	}
 }
 
 func getQuestions(db *sql.DB) gin.HandlerFunc {
@@ -125,33 +149,5 @@ func getQuestions(db *sql.DB) gin.HandlerFunc {
         }
 
         c.JSON(http.StatusOK, gin.H{"questions": result})
-    }
-}
-
-func GetSurveyResultsHandler(db *sql.DB) gin.HandlerFunc {
-    return func(c *gin.Context) {
-        surveyID, err := strconv.Atoi(c.Param("survey_id"))
-        if err != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный ID опроса"})
-            return
-        }
-
-        userID, err := getUserIDFromToken(c)
-        if err != nil {
-            c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
-            return
-        }
-
-        results, err := database.GetSurveyResults(db, surveyID, userID)
-        if err != nil {
-            if errors.Is(err, sql.ErrNoRows) {
-                c.JSON(http.StatusNotFound, gin.H{"error": "Результаты не найдены"})
-                return
-            }
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
-
-        c.JSON(http.StatusOK, results)
     }
 }

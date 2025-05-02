@@ -25,11 +25,12 @@ export function MainNav() {
   }
 
   const routes = [
-    { href: "/", label: "Главная", showAlways: true },
+    { href: "/", label: "Главная", showWhenLoggedOut: true },
     { href: "/surveys", label: "Опросы", showAlways: true },
+    { href: "/my-surveys", label: "Мои опросы", showWhenLoggedIn: true }, // Добавлено
     { href: "/create-survey", label: "Создать опрос", showWhenLoggedIn: true },
-    { href: "/analytics", label: "Аналитика", showWhenLoggedIn: true }, 
-    { href: "/account", label: "Личный кабинет", showWhenLoggedIn: true }, 
+    { href: "/analytics", label: "Аналитика", showWhenLoggedIn: true },
+    { href: "/account", label: "Личный кабинет", showWhenLoggedIn: true },
     { href: "/login", label: "Вход", showWhenLoggedOut: true },
     { href: "/register", label: "Регистрация", showWhenLoggedOut: true },
   ]

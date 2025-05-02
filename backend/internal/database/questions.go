@@ -9,28 +9,28 @@ import (
     "my-auth-app/internal/models"
 )
 
-func CreateQuestion(db *sql.DB, question *models.Question) error {
-    var answersJSON []byte
-    var err error
-    
-    if question.IsTest {
-        answersJSON, err = json.Marshal(question.Answers)
-        if err != nil {
-            log.Printf("Answers marshaling error: %v", err)
-            return fmt.Errorf("ошибка сериализации ответов: %v", err)
-        }
-    } else {
-        answersJSON = []byte("[]")
-    }
+func CreateQuestion(db Executor, question *models.Question) error {
+	var answersJSON []byte
+	var err error
 
-    err = db.QueryRow(
-        `INSERT INTO questions (survey_id, question_text, is_required, is_test, 
-        correct_answer, ball, answers) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-        question.SurveyID, question.QuestionText, question.IsRequired,
-        question.IsTest, question.CorrectAnswer, question.Ball, answersJSON,
-    ).Scan(&question.ID)
+	if question.IsTest {
+		answersJSON, err = json.Marshal(question.Answers)
+		if err != nil {
+			log.Printf("Answers marshaling error: %v", err)
+			return fmt.Errorf("ошибка сериализации ответов: %v", err)
+		}
+	} else {
+		answersJSON = []byte("[]")
+	}
 
-    return err
+	err = db.QueryRow(
+		`INSERT INTO questions (survey_id, question_text, is_required, is_test, 
+		correct_answer, ball, answers) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+		question.SurveyID, question.QuestionText, question.IsRequired,
+		question.IsTest, question.CorrectAnswer, question.Ball, answersJSON,
+	).Scan(&question.ID)
+
+	return err
 }
 
 func GetQuestions(db *sql.DB, surveyID int) ([]models.Question, error) {
@@ -146,7 +146,6 @@ func DeleteQuestion(db *sql.DB, questionID, userID int) error {
     return err
 }
 
-// DeleteQuestionsExcept удаляет вопросы не входящие в список ID
 func DeleteQuestionsExcept(tx *sql.Tx, surveyID int, keepIDs []int) error {
     query := "DELETE FROM questions WHERE survey_id = $1"
     args := []interface{}{surveyID}

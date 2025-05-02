@@ -1,9 +1,22 @@
+"use client"
+
+import { useRouter } from "next/navigation"
+import { useEffect } from "react"
 import { MainNav } from "@/components/main-nav"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import Link from "next/link"
 
 export default function Home() {
+  const router = useRouter()
+
+  useEffect(() => {
+    const token = localStorage.getItem("token")
+    if (token) {
+      router.push("/surveys") // Перенаправляем авторизованных пользователей
+    }
+  }, [router])
+
   return (
     <div className="flex min-h-screen flex-col">
       <MainNav />
