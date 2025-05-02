@@ -16,4 +16,6 @@ func RegisterSurveyRoutes(r *gin.Engine, db *sql.DB) {
     r.GET("/survey/:survey_id/answers/simple", getUserSimpleSurveyAnswers(db))
     r.PUT("/survey/:id", updateSurvey(db))
     r.GET("/survey/:survey_id/results", GetSurveyResultsHandler(db))
+    r.GET("/my-surveys", getUserSurveys(db))
+    r.GET("/surveys/:survey_id/participants", getSurveyParticipants(db))
 }

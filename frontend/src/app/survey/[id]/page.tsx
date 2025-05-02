@@ -171,7 +171,8 @@ export default function SurveyPage() {
         description: "Ваши ответы успешно отправлены.",
       })
 
-      router.push("/surveys")
+      //router.push("/surveys")
+      router.push(`/survey/${surveyId}/results`)
     } catch (error) {
       console.error("Ошибка при отправке ответов:", error)
       toast({

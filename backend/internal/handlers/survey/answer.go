@@ -1,10 +1,9 @@
 package handlers
 
 import (
-    "bytes"
     "database/sql"
-    "io"
     "log"
+   // "encoding/json"
     "strconv"
     "net/http"
     "my-auth-app/internal/models"
@@ -12,17 +11,10 @@ import (
     "github.com/gin-gonic/gin"
 )
 
+
 func createAnswerUser(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
-        bodyBytes, err := io.ReadAll(c.Request.Body)
-        if err != nil {
-            log.Printf("Failed to read request body: %v", err)
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось прочитать запрос"})
-            return
-        }
-        log.Printf("Received request: %s", string(bodyBytes))
-        c.Request.Body = io.NopCloser(bytes.NewReader(bodyBytes))
-
+        // Получаем ID пользователя из токена
         userID, err := getUserIDFromToken(c)
         if err != nil {
             log.Printf("Auth error: %v", err)
@@ -30,18 +22,26 @@ func createAnswerUser(db *sql.DB) gin.HandlerFunc {
             return
         }
 
+        // Парсим тело запроса
         var req struct {
             Answers []models.AnswerUser `json:"answers"`
         }
         if err := c.ShouldBindJSON(&req); err != nil {
             log.Printf("JSON parse error: %v", err)
             c.JSON(http.StatusBadRequest, gin.H{
-                "error": "Неверный формат запроса",
-                "details": err.Error(),
+                "error":    "Неверный формат запроса",
+                "details":  err.Error(),
             })
             return
         }
 
+        // Проверяем наличие ответов
+        if len(req.Answers) == 0 {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Нет ответов для сохранения"})
+            return
+        }
+
+        // Начинаем транзакцию
         tx, err := db.Begin()
         if err != nil {
             log.Printf("Transaction start failed: %v", err)
@@ -51,43 +51,62 @@ func createAnswerUser(db *sql.DB) gin.HandlerFunc {
         defer func() {
             if err != nil {
                 tx.Rollback()
-                return
             }
-            tx.Commit()
         }()
 
+        // Получаем ID опроса из первого вопроса
+        surveyID, err := database.GetSurveyIDByQuestionID(db, req.Answers[0].QuestionID)
+        if err != nil {
+            log.Printf("Survey ID fetch error: %v", err)
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Ошибка определения опроса"})
+            return
+        }
+
+        // Удаляем предыдущие данные
+        if err := database.DeleteUserAnswers(db, userID, surveyID); err != nil {
+            log.Printf("Delete answers error: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка очистки ответов"})
+            return
+        }
+
+        if err := database.DeleteUserResult(db, userID, surveyID); err != nil {
+            log.Printf("Delete result error: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка очистки результатов"})
+            return
+        }
+
+        totalScore := 0
         for _, answer := range req.Answers {
-            answer.UserID = int(userID)
-            
+            // Привязываем пользователя к ответу
+            answer.UserID = userID
+
+            // Получаем полную информацию о вопросе
             question, err := database.GetQuestionWithAnswers(db, answer.QuestionID)
             if err != nil {
                 log.Printf("Question fetch error: %v", err)
                 c.JSON(http.StatusBadRequest, gin.H{
-                    "error": "Ошибка получения вопроса",
-                    "question_id": answer.QuestionID,
+                    "error":        "Ошибка получения вопроса",
+                    "question_id":  answer.QuestionID,
                 })
                 return
             }
 
+            // Проверяем правильность ответа
             isCorrect, err := checkAnswerCorrectness(answer, question)
             if err != nil {
                 c.JSON(http.StatusBadRequest, gin.H{
-                    "error": "Ошибка проверки ответа",
-                    "details": err.Error(),
+                    "error":    "Ошибка проверки ответа",
+                    "details":  err.Error(),
                 })
                 return
             }
 
+            // Суммируем баллы
             if isCorrect {
-                if err := processCorrectAnswer(db, question, answer); err != nil {
-                    log.Printf("Score update error: %v", err)
-                    c.JSON(http.StatusInternalServerError, gin.H{
-                        "error": "Ошибка начисления баллов",
-                    })
-                    return
-                }
+                totalScore += question.Ball
             }
 
+            // Сохраняем ответ
             if err := database.CreateAnswerUser(db, &answer); err != nil {
                 log.Printf("Answer save error: %v", err)
                 c.JSON(http.StatusInternalServerError, gin.H{
@@ -97,7 +116,24 @@ func createAnswerUser(db *sql.DB) gin.HandlerFunc {
             }
         }
 
-        c.JSON(http.StatusOK, gin.H{"message": "Ответы успешно сохранены"})
+        // Сохраняем общий результат
+        if err := database.SaveUserResult(db, surveyID, userID, totalScore); err != nil {
+            log.Printf("Save result error: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка сохранения результата"})
+            return
+        }
+
+        // Фиксируем транзакцию
+        if err := tx.Commit(); err != nil {
+            log.Printf("Transaction commit error: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка фиксации транзакции"})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{
+            "message":     "Результаты успешно обновлены",
+            "total_score": totalScore,
+        })
     }
 }
 
@@ -130,3 +166,4 @@ func getUserSimpleSurveyAnswers(db *sql.DB) gin.HandlerFunc {
         })
     }
 }
+

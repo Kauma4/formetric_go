@@ -53,6 +53,7 @@ func createTables(db *sql.DB) error {
         title TEXT NOT NULL,
         description TEXT,
         created_by INTEGER NOT NULL,
+        max_ball INT DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
     );
@@ -98,6 +99,7 @@ func createTables(db *sql.DB) error {
 
     return nil
 }
+
 /*
 func CreateSurvey(db *sql.DB, survey *models.Survey) error {
     var surveyID int

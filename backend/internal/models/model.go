@@ -1,6 +1,7 @@
 package models
 
 import "database/sql"
+import "time"
 
 type User struct {
     ID          int       `json:"id"`
@@ -14,6 +15,13 @@ type User struct {
     Location    sql.NullString   `json:"location"`
 }
 
+type ParticipantResult struct {
+    UserID    int       `json:"user_id"`
+    Username  string    `json:"username"`
+    TotalBall int       `json:"total_score"`
+    Date      time.Time `json:"date"`
+    MaxScore  int       `json:"max_score"`
+}
 
 type Survey struct {
     ID          int    `json:"id"`
@@ -21,7 +29,14 @@ type Survey struct {
     Description string `json:"description"`
     IsPrivate   bool   `json:"is_private"` 
     CreatedBy   int    `json:"created_by"`
-  }
+    CreatedAt   time.Time `json:"created_at"`
+}
+
+type SurveyResult struct {
+    TotalScore int    `json:"total_score"`
+    MaxScore   int    `json:"max_score"`
+    Date       string `json:"date"`
+}
 
 type Question struct {
     ID           int      `json:"id"`
@@ -70,6 +85,8 @@ type UserAnswerSimple struct {
     CorrectAnswer  string `json:"correct_answer,omitempty"` // Добавляем для всех типов вопросов
     IsCorrect      *bool  `json:"is_correct,omitempty"`     // Только для тестовых вопросов
 }
+
+
 
 
 

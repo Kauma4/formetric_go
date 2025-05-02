@@ -10,7 +10,6 @@ import (
     "github.com/gin-gonic/gin"
 )
 
-
 func updateSurvey(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
         surveyIDStr := c.Param("id")

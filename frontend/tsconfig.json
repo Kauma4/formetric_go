@@ -16,7 +16,8 @@
     "strictNullChecks": true,
     "baseUrl": "./src",
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@/components/*": ["./components/*"]
     },
     "plugins": [{ "name": "next" }]
   },

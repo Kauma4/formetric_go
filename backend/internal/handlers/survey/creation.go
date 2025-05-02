@@ -1,6 +1,7 @@
 package handlers
 
 import (
+    "strconv"
     "database/sql"
     "log"
     "net/http"
@@ -55,5 +56,66 @@ func getSurveys(db *sql.DB) gin.HandlerFunc {
 
         log.Println("Ответ с опросами:", surveys)
         c.JSON(http.StatusOK, surveys)
+    }
+}
+
+func getUserSurveys(db *sql.DB) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        userID, err := getUserIDFromToken(c)
+        if err != nil {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
+            return
+        }
+
+        surveys, err := database.GetSurveysByCreator(db, userID)
+        if err != nil {
+            log.Printf("Ошибка получения опросов: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{
+                "error": "Не удалось получить опросы",
+                "details": err.Error(),
+            })
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{
+            "surveys": surveys,
+        })
+    }
+}
+
+func getSurveyParticipants(db *sql.DB) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        // Получаем ID опроса
+        surveyID, err := strconv.Atoi(c.Param("survey_id"))
+        if err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный ID опроса"})
+            return
+        }
+
+        // Проверяем права доступа
+        userID, err := getUserIDFromToken(c)
+        if err != nil {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
+            return
+        }
+
+        ownerID, err := database.GetSurveyOwnerID(db, surveyID)
+        if err != nil || ownerID != userID {
+            c.JSON(http.StatusForbidden, gin.H{"error": "Нет доступа к статистике опроса"})
+            return
+        }
+
+        // Получаем данные
+        participants, err := database.GetSurveyParticipants(db, surveyID)
+        if err != nil {
+            log.Printf("Ошибка получения участников: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка получения данных"})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{
+            "survey_id": surveyID,
+            "participants": participants,
+        })
     }
 }
