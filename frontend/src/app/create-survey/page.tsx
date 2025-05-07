@@ -36,7 +36,7 @@ export default function CreateSurveyPage() {
   const [questions, setQuestions] = useState<QuestionForm[]>([
     { 
       text: "", 
-      ball: 1, 
+      ball: 0, 
       type: "test",
       required: true,
       multipleAnswers: false,
@@ -400,7 +400,7 @@ export default function CreateSurveyPage() {
                                 value={question.ball}
                                 onChange={(e) => handleQuestionChange(qIndex, "ball", Number(e.target.value))}
                                 className="w-16"
-                                min="1"
+                                min="0"
                               />
                             </div>
                           </div>

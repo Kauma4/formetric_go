@@ -30,6 +30,9 @@ func main() {
 	}
 	defer db.Close()
 
+	// Обслуживание статических файлов из директории uploads
+	router.Static("/uploads", "./uploads")
+
 	// Регистрируем маршруты
 	authHandlers.RegisterRoutes(router, db)
 	surveyHandlers.RegisterSurveyRoutes(router, db)

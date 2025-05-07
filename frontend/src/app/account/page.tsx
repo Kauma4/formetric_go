@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -23,6 +23,9 @@ interface UserData {
 
 const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 const phoneRegex = /^\+7[-\s]?\(?\d{3}\)?[-\s]?\d{3}[-\s]?\d{2}[-\s]?\d{2}$/;
+const maxFileSize = 2 * 1024 * 1024; // 2 MB
+const allowedFileTypes = ["image/jpeg", "image/png", "image/gif"];
+const BASE_URL = "http://localhost:8080"; // Базовый URL сервера
 
 export default function AccountPage() {
   const [userData, setUserData] = useState<UserData | null>(null)
@@ -39,9 +42,10 @@ export default function AccountPage() {
   })
   const [avatarPreview, setAvatarPreview] = useState<string>("")
   const [isAvatarLoading, setIsAvatarLoading] = useState(false)
-  const [showPassword, setShowPassword] = useState(false) // состояние для отображения пароля
+  const [showPassword, setShowPassword] = useState(false)
   const { toast } = useToast()
   const router = useRouter()
+  const avatarInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -52,13 +56,14 @@ export default function AccountPage() {
       }
 
       try {
-        const response = await fetch("http://localhost:8080/user", {
+        const response = await fetch(`${BASE_URL}/user`, {
           headers: { Authorization: `Bearer ${token}` }
         })
         
-        if (!response.ok) throw new Error("Ошибка загрузки")
+        if (!response.ok) throw new Error("Ошибка загрузки данных пользователя")
 
         const data = await response.json()
+        console.log("Fetched user data:", data) // Логирование данных пользователя
         setUserData(data)
         setFormData({
           username: data.username,
@@ -70,25 +75,33 @@ export default function AccountPage() {
           location: data.location || ""
         })
       } catch (error) {
-        toast({ variant: "destructive", title: "Ошибка", description: "Не удалось загрузить данные" })
+        toast({ variant: "destructive", title: "Ошибка", description: "Не удалось загрузить данные пользователя" })
       } finally {
         setIsLoading(false)
       }
     }
 
     fetchUserData()
-  }, [])
+
+    return () => {
+      // Очистка временного URL предварительного просмотра
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview)
+    }
+  }, [router, toast])
 
   const handleUpdate = async () => {
     const token = localStorage.getItem("token")
-    if (!token) return
-
-    if (!formData.username || !formData.password) {
-      toast({ variant: "destructive", title: "Ошибка", description: "Имя пользователя и пароль обязательны" })
+    if (!token) {
+      toast({ variant: "destructive", title: "Ошибка", description: "Требуется авторизация" })
       return
     }
 
-    if (!emailRegex.test(formData.email)) {
+    if (!formData.username) {
+      toast({ variant: "destructive", title: "Ошибка", description: "Имя пользователя обязательно" })
+      return
+    }
+
+    if (formData.email && !emailRegex.test(formData.email)) {
       toast({ variant: "destructive", title: "Ошибка", description: "Неверный формат email" })
       return
     }
@@ -99,7 +112,7 @@ export default function AccountPage() {
     }
 
     try {
-      const response = await fetch("http://localhost:8080/user", {
+      const response = await fetch(`${BASE_URL}/user`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -108,47 +121,76 @@ export default function AccountPage() {
         body: JSON.stringify(formData)
       })
 
-      if (!response.ok) throw new Error("Ошибка обновления")
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Ошибка обновления профиля")
+      }
 
       const updatedData = await response.json()
       setUserData(updatedData)
       setIsEditing(false)
-      toast({ title: "Успешно", description: "Данные обновлены" })
-    } catch (error) {
-      toast({ variant: "destructive", title: "Ошибка", description: "Не удалось обновить данные" })
+      toast({ title: "Успех", description: "Данные профиля обновлены" })
+    } catch (error: any) {
+      toast({ variant: "destructive", title: "Ошибка", description: error.message || "Не удалось обновить данные" })
     }
   }
 
   const handleAvatarChange = async (files: FileList | null) => {
     if (!files || files.length === 0) return
-    
+
     const file = files[0]
+    if (!allowedFileTypes.includes(file.type)) {
+      toast({ variant: "destructive", title: "Ошибка", description: "Разрешены только файлы JPEG, PNG или GIF" })
+      return
+    }
+
+    if (file.size > maxFileSize) {
+      toast({ variant: "destructive", title: "Ошибка", description: "Размер файла не должен превышать 2 МБ" })
+      return
+    }
+
+    const token = localStorage.getItem("token")
+    if (!token) {
+      toast({ variant: "destructive", title: "Ошибка", description: "Требуется авторизация" })
+      return
+    }
+
     const formData = new FormData()
     formData.append("avatar", file)
 
-    const token = localStorage.getItem("token")
-    if (!token) return
-
     setIsAvatarLoading(true)
     try {
-      const response = await fetch("http://localhost:8080/user/avatar", {
+      const response = await fetch(`${BASE_URL}/user/avatar`, {
         method: "POST",
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${token}`
         },
-        body: formData,
+        body: formData
       })
 
-      if (!response.ok) throw new Error("Ошибка загрузки аватара")
-
       const data = await response.json()
-      setUserData(prev => prev ? ({ ...prev, avatar_url: data.avatar_url }) : null)
+      console.log("Avatar upload response:", data) // Логирование ответа
+      if (!response.ok) {
+        throw new Error(data.error || "Ошибка загрузки аватара")
+      }
+
+      // Повторный запрос данных пользователя для синхронизации
+      const userResponse = await fetch(`${BASE_URL}/user`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      if (!userResponse.ok) throw new Error("Ошибка загрузки данных пользователя")
+      const updatedUserData = await userResponse.json()
+      console.log("Updated user data after avatar upload:", updatedUserData) // Логирование обновленных данных
+      setUserData(updatedUserData)
+
       setAvatarPreview("")
-      toast({ title: "Успешно", description: "Аватар обновлен" })
-    } catch (error) {
-      toast({ variant: "destructive", title: "Ошибка", description: "Не удалось обновить аватар" })
+      toast({ title: "Успех", description: "Аватар успешно обновлен" })
+    } catch (error: any) {
+      console.error("Avatar upload error:", error)
+      toast({ variant: "destructive", title: "Ошибка", description: error.message || "Не удалось загрузить аватар" })
     } finally {
       setIsAvatarLoading(false)
+      if (avatarInputRef.current) avatarInputRef.current.value = ""
     }
   }
 
@@ -173,7 +215,21 @@ export default function AccountPage() {
     )
   }
 
-  const hasChanges = JSON.stringify(formData) !== JSON.stringify(userData);
+  const hasChanges = JSON.stringify({
+    username: userData.username,
+    email: userData.email || "",
+    full_name: userData.full_name || "",
+    phone_number: userData.phone_number || "",
+    date_of_birth: userData.date_of_birth?.split('T')[0] || "",
+    location: userData.location || ""
+  }) !== JSON.stringify({
+    username: formData.username,
+    email: formData.email,
+    full_name: formData.full_name,
+    phone_number: formData.phone_number,
+    date_of_birth: formData.date_of_birth,
+    location: formData.location
+  });
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -187,7 +243,7 @@ export default function AccountPage() {
             <div className="flex flex-col items-center gap-4">
               <div 
                 className="relative group w-32 h-32 rounded-full cursor-pointer"
-                onClick={() => document.getElementById("avatarInput")?.click()}
+                onClick={() => avatarInputRef.current?.click()}
               >
                 {isAvatarLoading ? (
                   <div className="w-full h-full rounded-full bg-gray-100 flex items-center justify-center">
@@ -198,12 +254,12 @@ export default function AccountPage() {
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity rounded-full flex items-center justify-center">
                       <Camera className="text-white w-8 h-8" />
                     </div>
-                    
                     {userData.avatar_url || avatarPreview ? (
                       <img
-                        src={avatarPreview || userData.avatar_url}
-                        alt="Avatar"
+                        src={avatarPreview || `${BASE_URL}${userData.avatar_url}`}
+                        alt="Аватар"
                         className="w-full h-full rounded-full object-cover border-2"
+                        onError={(e) => console.error("Error loading avatar:", userData.avatar_url)} // Логирование ошибок загрузки
                       />
                     ) : (
                       <div className="w-full h-full rounded-full bg-gray-100 flex items-center justify-center text-4xl font-bold">
@@ -216,15 +272,11 @@ export default function AccountPage() {
 
               <input
                 id="avatarInput"
+                ref={avatarInputRef}
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={(e) => {
-                  if (e.target.files?.[0]) {
-                    setAvatarPreview(URL.createObjectURL(e.target.files[0]))
-                    handleAvatarChange(e.target.files)
-                  }
-                }}
+                onChange={(e) => handleAvatarChange(e.target.files)}
               />
 
               <span className="text-sm text-muted-foreground">
@@ -309,7 +361,18 @@ export default function AccountPage() {
 
                 <div className="flex gap-2">
                   <Button onClick={handleUpdate} disabled={!hasChanges}>Сохранить</Button>
-                  <Button variant="outline" onClick={() => setIsEditing(false)}>
+                  <Button variant="outline" onClick={() => {
+                    setIsEditing(false)
+                    setFormData({
+                      username: userData.username,
+                      email: userData.email || "",
+                      password: "",
+                      full_name: userData.full_name || "",
+                      phone_number: userData.phone_number || "",
+                      date_of_birth: userData.date_of_birth?.split('T')[0] || "",
+                      location: userData.location || ""
+                    })
+                  }}>
                     Отмена
                   </Button>
                 </div>

@@ -44,7 +44,7 @@ func createTables(db *sql.DB) error {
         date_of_birth DATE,
         location TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        deleted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        deleted_at TIMESTAMP DEFAULT NULL
     );
 
     CREATE TABLE IF NOT EXISTS surveys (

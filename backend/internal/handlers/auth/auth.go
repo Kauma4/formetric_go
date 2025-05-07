@@ -4,9 +4,13 @@ import (
     "errors"
     "strings"
     "strconv"
+    "log"
+    "os"
+    "io"
     "fmt"
     "time"
     "database/sql"
+    "path/filepath" 
     "my-auth-app/internal/models"
     "my-auth-app/internal/database"
     "my-auth-app/internal/jwt"  
@@ -28,6 +32,7 @@ func RegisterRoutes(r *gin.Engine, db *sql.DB) {
         authGroup.GET("/user", getUser(db))
         authGroup.PUT("/user", updateUserProfile(db))
         authGroup.DELETE("/user", DeleteUserHandler(db))
+        authGroup.POST("/user/avatar", uploadAvatar(db))
     }
 }
 
@@ -145,6 +150,81 @@ func loginUser(db *sql.DB) gin.HandlerFunc {
         c.JSON(http.StatusOK, gin.H{"message": "Успешный вход", "token": token})
     }
 }
+
+
+func uploadAvatar(db *sql.DB) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        userID, err := getUserIDFromToken(c)
+        if err != nil {
+            c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+            return
+        }
+
+        file, header, err := c.Request.FormFile("avatar")
+        if err != nil {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Не удалось получить файл"})
+            return
+        }
+        defer file.Close()
+
+        allowedTypes := map[string]bool{
+            "image/jpeg": true,
+            "image/png":  true,
+            "image/gif":  true,
+        }
+        if !allowedTypes[header.Header.Get("Content-Type")] {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Разрешены только файлы JPEG, PNG или GIF"})
+            return
+        }
+
+        if header.Size > 2*1024*1024 {
+            c.JSON(http.StatusBadRequest, gin.H{"error": "Размер файла не должен превышать 2 МБ"})
+            return
+        }
+
+        uploadDir := "./uploads/avatars"
+        if err := os.MkdirAll(uploadDir, os.ModePerm); err != nil {
+            log.Printf("Ошибка создания директории: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка сервера"})
+            return
+        }
+
+        ext := filepath.Ext(header.Filename)
+        filename := fmt.Sprintf("%d_%d%s", userID, time.Now().UnixNano(), ext)
+        filePath := filepath.Join(uploadDir, filename)
+
+        out, err := os.Create(filePath)
+        if err != nil {
+            log.Printf("Ошибка создания файла: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка сохранения файла"})
+            return
+        }
+        defer out.Close()
+
+        if _, err := io.Copy(out, file); err != nil {
+            log.Printf("Ошибка копирования файла: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка сохранения файла"})
+            return
+        }
+
+        avatarURL := fmt.Sprintf("/uploads/avatars/%s", filename)
+        _, err = db.Exec(
+            "UPDATE users SET avatar_url = $1 WHERE id = $2",
+            avatarURL, userID,
+        )
+        if err != nil {
+            log.Printf("Ошибка обновления avatar_url: %v", err)
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка обновления данных пользователя"})
+            return
+        }
+
+        c.JSON(http.StatusOK, gin.H{
+            "message": "Аватар успешно загружен",
+            "avatar_url": avatarURL,
+        })
+    }
+}
+
 
 func updateUserProfile(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
