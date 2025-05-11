@@ -1,4 +1,4 @@
-package handlers
+package utils
 
 import (
     "errors"
@@ -6,7 +6,7 @@ import (
     "github.com/gin-gonic/gin"
 )
 
-func getUserIDFromToken(c *gin.Context) (int, error) {
+func GetUserIDFromToken(c *gin.Context) (int, error) {
     tokenString := c.GetHeader("Authorization")
     if tokenString == "" {
         return 0, errors.New("отсутствует токен")

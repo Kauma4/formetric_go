@@ -8,6 +8,7 @@ import (
     "my-auth-app/internal/models"
     "my-auth-app/internal/database"
     "github.com/gin-gonic/gin"
+    "my-auth-app/internal/utils"
 )
 
 func createSurvey(db *sql.DB) gin.HandlerFunc {
@@ -19,7 +20,7 @@ func createSurvey(db *sql.DB) gin.HandlerFunc {
         }
     
         
-        userID, err := getUserIDFromToken(c)
+        userID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
             return
@@ -61,7 +62,7 @@ func getSurveys(db *sql.DB) gin.HandlerFunc {
 
 func getUserSurveys(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
-        userID, err := getUserIDFromToken(c)
+        userID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
             return
@@ -93,7 +94,7 @@ func getSurveyParticipants(db *sql.DB) gin.HandlerFunc {
         }
 
         // Проверяем права доступа
-        userID, err := getUserIDFromToken(c)
+        userID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
             return

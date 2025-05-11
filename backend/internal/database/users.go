@@ -6,8 +6,9 @@ import (
     "fmt"
     "golang.org/x/crypto/bcrypt"
     "my-auth-app/internal/models"
+    "my-auth-app/internal/utils"
 )
-
+/*
 func CreateUser(db *sql.DB, user *models.User) error {
     hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
     if err != nil {
@@ -20,6 +21,34 @@ func CreateUser(db *sql.DB, user *models.User) error {
         user.PhoneNumber, user.DateOfBirth, user.Location,
     )
     return err
+}
+*/
+
+func CreateUser(db *sql.DB, user *models.User) error {
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return errors.New("failed to hash password")
+	}
+
+	_, err = db.Exec(
+		"INSERT INTO users (username, password, email, full_name, avatar_url, phone_number, date_of_birth, location) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+		user.Username, string(hashedPassword), user.Email, user.FullName, user.AvatarURL,
+		user.PhoneNumber, user.DateOfBirth, user.Location,
+	)
+	if err != nil {
+		return err
+	}
+
+	// Отправляем письмо с подтверждением, если email указан
+	if user.Email.Valid && user.Email.String != "" {
+		err = utils.SendVerificationEmail(user.Email.String, user.Username)
+		if err != nil {
+			// Логируем ошибку, но не прерываем процесс, так как регистрация уже успешна
+			fmt.Printf("Failed to send verification email to %s: %v\n", user.Email.String, err)
+		}
+	}
+
+	return nil
 }
 
 func GetUserByUsername(db *sql.DB, username string) (*models.User, error) {
@@ -39,6 +68,27 @@ func GetUserByUsername(db *sql.DB, username string) (*models.User, error) {
     }
     return &user, nil
 }
+
+func GetUserByLogin(db *sql.DB, login string) (*models.User, error) {
+	var user models.User
+	query := `
+		SELECT id, username, password, email, full_name, avatar_url, phone_number, date_of_birth, location 
+		FROM users 
+		WHERE username = $1 OR email = $1
+	`
+	err := db.QueryRow(query, login).Scan(
+		&user.ID, &user.Username, &user.Password, &user.Email, &user.FullName,
+		&user.AvatarURL, &user.PhoneNumber, &user.DateOfBirth, &user.Location,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &user, nil
+}
+
 
 func GetUserByID(db *sql.DB, userID int) (*models.User, error) {
     var user models.User

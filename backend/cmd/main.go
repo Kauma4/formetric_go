@@ -1,3 +1,4 @@
+
 package main
 
 import (
@@ -6,38 +7,38 @@ import (
 
 	authHandlers "my-auth-app/internal/handlers/auth"
 	surveyHandlers "my-auth-app/internal/handlers/survey"
-	
+	analyticsHandlers "my-auth-app/internal/handlers/analytics"
+
 	"github.com/gin-gonic/gin"
 	"github.com/gin-contrib/cors"
+    "github.com/joho/godotenv"
 )
-
 func main() {
+	// Загружаем .env файл
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found")
+	}
 
-	// Используем один экземпляр gin.Default()
 	router := gin.Default()
-	// Включаем CORS
 	router.Use(cors.New(cors.Config{
-        AllowOrigins:     []string{"http://localhost:3000"}, // Разрешаем только с этого адреса
-        AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-        AllowHeaders:     []string{"Authorization", "Content-Type"},
-        AllowCredentials: true,
-    }))
+		AllowOrigins:     []string{"http://localhost:3000"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Authorization", "Content-Type"},
+		AllowCredentials: true,
+	}))
 
-	// Подключаем базу данных
 	db, err := database.Connect()
 	if err != nil {
 		log.Fatal("Ошибка подключения к базе данных:", err)
 	}
 	defer db.Close()
 
-	// Обслуживание статических файлов из директории uploads
 	router.Static("/uploads", "./uploads")
 
-	// Регистрируем маршруты
+
+	analyticsHandlers.RegisterAnalyticsRoutes(router, db)
 	authHandlers.RegisterRoutes(router, db)
 	surveyHandlers.RegisterSurveyRoutes(router, db)
 
-	// Запускаем сервер
 	router.Run(":8080")
 }
-

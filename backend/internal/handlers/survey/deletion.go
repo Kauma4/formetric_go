@@ -5,6 +5,7 @@ import (
     "net/http"
     "strconv"
     "my-auth-app/internal/database"
+    "my-auth-app/internal/utils"
     "github.com/gin-gonic/gin"
 )
 
@@ -17,7 +18,7 @@ func deleteSurvey(db *sql.DB) gin.HandlerFunc {
             return
         }
 
-        userID, err := getUserIDFromToken(c)
+        userID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
             return
@@ -44,7 +45,7 @@ func deleteQuestion(db *sql.DB) gin.HandlerFunc {
             return
         }
 
-        userID, err := getUserIDFromToken(c)
+        userID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
             return

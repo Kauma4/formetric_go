@@ -14,6 +14,7 @@ import (
     "my-auth-app/internal/models"
     "my-auth-app/internal/database"
     "my-auth-app/internal/jwt"  
+    "my-auth-app/internal/utils"
     "golang.org/x/crypto/bcrypt" 
     "net/http"
     "github.com/gin-gonic/gin"
@@ -39,7 +40,7 @@ func RegisterRoutes(r *gin.Engine, db *sql.DB) {
 func getUser(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
         // Получаем userID из токена
-        userID, err := getUserIDFromToken(c)
+        userID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
             return
@@ -84,77 +85,115 @@ func getUser(db *sql.DB) gin.HandlerFunc {
 }
 
 func registerUser(db *sql.DB) gin.HandlerFunc {
-    return func(c *gin.Context) {
-        var user models.User
+	return func(c *gin.Context) {
+		var input models.RegisterUserInput
 
-        if err := c.ShouldBindJSON(&user); err != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный запрос"})
-            return
-        }
+		if err := c.ShouldBindJSON(&input); err != nil {
+			log.Printf("Ошибка привязки JSON: %v", err)
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный запрос", "details": err.Error()})
+			return
+		}
 
-        if user.Username == "" || user.Password == "" {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Необходимо указать имя пользователя и пароль"})
-            return
-        }
+		if input.Username == "" || input.Password == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Необходимо указать имя пользователя и пароль"})
+			return
+		}
 
-        existingUser, err := database.GetUserByUsername(db, user.Username)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка базы данных"})
-            return
-        }
-        if existingUser != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Имя пользователя уже занято"})
-            return
-        }
+		existingUser, err := database.GetUserByUsername(db, input.Username)
+		if err != nil {
+			log.Printf("Ошибка проверки username: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка базы данных"})
+			return
+		}
+		if existingUser != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Имя пользователя уже занято"})
+			return
+		}
 
-        if err := database.CreateUser(db, &user); err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-            return
-        }
+		if input.Email != "" {
+			existingUser, err := database.GetUserByLogin(db, input.Email)
+			if err != nil {
+				log.Printf("Ошибка проверки email: %v", err)
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка базы данных"})
+				return
+			}
+			if existingUser != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "Email уже используется"})
+				return
+			}
+		}
 
-        c.JSON(http.StatusOK, gin.H{"message": "Пользователь успешно зарегистрирован"})
-    }
+		user := input.ToUser()
+		if err := database.CreateUser(db, &user); err != nil {
+			log.Printf("Ошибка создания пользователя: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "Пользователь успешно зарегистрирован"})
+	}
 }
 
 func loginUser(db *sql.DB) gin.HandlerFunc {
-    return func(c *gin.Context) {
-        var credentials models.User
+	return func(c *gin.Context) {
+		var credentials struct {
+			Login    string `json:"username"`
+			Password string `json:"password"`
+		}
 
-        if err := c.ShouldBindJSON(&credentials); err != nil {
-            c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный запрос"})
-            return
-        }
+		if err := c.ShouldBindJSON(&credentials); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный запрос"})
+			return
+		}
 
-        user, err := database.GetUserByUsername(db, credentials.Username)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка базы данных"})
-            return
-        }
-        if user == nil {
-            c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверное имя пользователя или пароль"})
-            return
-        }
+		if credentials.Login == "" || credentials.Password == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Необходимо указать логин и пароль"})
+			return
+		}
 
-        err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(credentials.Password))
-        if err != nil {
-            c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверное имя пользователя или пароль"})
-            return
-        }
+		user, err := database.GetUserByLogin(db, credentials.Login)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Ошибка базы данных"})
+			return
+		}
+		if user == nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный логин или пароль"})
+			return
+		}
 
-        token, err := jwt.GenerateJWT(user.ID, user.Username)
-        if err != nil {
-            c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось сгенерировать токен"})
-            return
-        }
+		err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(credentials.Password))
+		if err != nil {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "Неверный логин или пароль"})
+			return
+		}
 
-        c.JSON(http.StatusOK, gin.H{"message": "Успешный вход", "token": token})
-    }
+		token, err := jwt.GenerateJWT(user.ID, user.Username)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось сгенерировать токен"})
+			return
+		}
+
+		// Если вход выполнен по email, отправляем токен на email
+		isEmailLogin := user.Email.Valid && user.Email.String == credentials.Login
+		if isEmailLogin {
+			err = utils.SendTokenEmail(user.Email.String, user.Username, token)
+			if err != nil {
+				// Логируем ошибку, но не прерываем процесс, так как токен уже сгенерирован
+				log.Printf("Failed to send token email to %s: %v\n", user.Email.String, err)
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Успешный вход",
+			"token":   token,
+			"email_sent": isEmailLogin,
+		})
+	}
 }
-
 
 func uploadAvatar(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
-        userID, err := getUserIDFromToken(c)
+        userID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
             return
@@ -225,11 +264,10 @@ func uploadAvatar(db *sql.DB) gin.HandlerFunc {
     }
 }
 
-
 func updateUserProfile(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
         // Получаем userID из токена
-        userID, err := getUserIDFromToken(c)
+        userID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
             return
@@ -344,7 +382,7 @@ func updateUserProfile(db *sql.DB) gin.HandlerFunc {
 func DeleteUserHandler(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
         // 1. Получаем ID пользователя через единую функцию
-        userID, err := getUserIDFromToken(c)
+        userID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
             return
@@ -401,7 +439,7 @@ func DeleteUserHandler(db *sql.DB) gin.HandlerFunc {
 
 func GetUserResultsHandler(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
-        userID, err := getUserIDFromToken(c)
+        userID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
             return
@@ -420,8 +458,6 @@ func GetUserResultsHandler(db *sql.DB) gin.HandlerFunc {
         c.JSON(http.StatusOK, results)
     }
 }
-
-
 
 func AuthMiddleware() gin.HandlerFunc {
     return func(c *gin.Context) {
@@ -449,4 +485,3 @@ func AuthMiddleware() gin.HandlerFunc {
         c.Next()
     }
 }
-

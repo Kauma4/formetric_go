@@ -50,4 +50,3 @@ func ExtractUserIDFromJWT(tokenString string) (int, error) {
 
     return 0, errors.New("невалидный токен")
 }
-

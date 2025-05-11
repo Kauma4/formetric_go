@@ -2,14 +2,11 @@ package handlers
 
 import (
     "database/sql"
-    "errors"
     "fmt"
 	"log"
     "strings"
     "my-auth-app/internal/models"
 	"my-auth-app/internal/database"
-    "my-auth-app/internal/jwt"
-    "github.com/gin-gonic/gin"
 )
 
 type Executor interface {
@@ -43,16 +40,4 @@ func processCorrectAnswer(db *sql.DB, question *models.Question, answer models.A
     }
     
     return database.UpdateUserResult(db, surveyID, answer.UserID, question.Ball)
-}
-
-
-func getUserIDFromToken(c *gin.Context) (int, error) {
-    tokenString := c.GetHeader("Authorization")
-    if tokenString == "" {
-        return 0, errors.New("отсутствует токен")
-    }
-    if len(tokenString) > 7 && tokenString[:7] == "Bearer " {
-        tokenString = tokenString[7:]
-    }
-    return jwt.ExtractUserIDFromJWT(tokenString)
 }

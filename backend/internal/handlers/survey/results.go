@@ -6,6 +6,7 @@ import (
     "strconv"
     "net/http"
     "my-auth-app/internal/database"
+    "my-auth-app/internal/utils"
     "github.com/gin-gonic/gin"
 )
 
@@ -18,7 +19,7 @@ func GetSurveyResultsHandler(db *sql.DB) gin.HandlerFunc {
             return
         }
 
-        userID, err := getUserIDFromToken(c)
+        userID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": "Требуется авторизация"})
             return

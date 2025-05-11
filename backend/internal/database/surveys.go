@@ -181,6 +181,116 @@ func GetSurveyParticipants(db *sql.DB, surveyID int) ([]models.ParticipantResult
 
 
 
+func GetSurveyAnalytics(db *sql.DB, surveyID int) (*models.SurveyAnalytics, error) {
+	// Получаем информацию об опросе
+	var survey models.Survey
+	err := db.QueryRow(`
+		SELECT id, title, description, is_private, created_by, created_at, max_ball
+		FROM surveys WHERE id = $1`, surveyID).Scan(
+		&survey.ID, &survey.Title, &survey.Description, &survey.IsPrivate,
+		&survey.CreatedBy, &survey.CreatedAt, &survey.MaxBall,
+	)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return nil, errors.New("опрос не найден")
+		}
+		return nil, err
+	}
+
+	// Получаем участников
+	participants, err := GetSurveyParticipants(db, surveyID)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка получения участников: %v", err)
+	}
+
+	// Получаем вопросы
+	questions, err := GetQuestions(db, surveyID)
+	if err != nil {
+		return nil, fmt.Errorf("ошибка получения вопросов: %v", err)
+	}
+
+	// Собираем аналитику по вопросам
+	var questionAnalytics []models.QuestionAnalytics
+	totalResponses := len(participants)
+	var totalScoreSum int
+	for _, q := range questions {
+		qa := models.QuestionAnalytics{Question: q}
+
+		// Получаем ответы пользователей на этот вопрос
+		rows, err := db.Query(`
+			SELECT au.answer_id, au.answer_user, u.username
+			FROM answers_users au
+			JOIN users u ON au.user_id = u.id
+			WHERE au.question_id = $1`, q.ID)
+		if err != nil {
+			return nil, fmt.Errorf("ошибка получения ответов для вопроса %d: %v", q.ID, err)
+		}
+		defer rows.Close()
+
+		answerCounts := make(map[int]int) // Для тестовых вопросов: answer_id -> count
+		var textResponses []models.TextResponse
+		var correctAnswers int
+
+		for rows.Next() {
+			var answerID sql.NullInt64
+			var answerText sql.NullString
+			var username string
+			if err := rows.Scan(&answerID, &answerText, &username); err != nil {
+				return nil, fmt.Errorf("ошибка сканирования ответа: %v", err)
+			}
+
+			if q.IsTest {
+				if answerID.Valid && int(answerID.Int64) > 0 && int(answerID.Int64) <= len(q.Answers) {
+					answerCounts[int(answerID.Int64)]++
+					if q.Answers[int(answerID.Int64)-1].Correct {
+						correctAnswers++
+					}
+				}
+			} else if answerText.Valid {
+				textResponses = append(textResponses, models.TextResponse{
+					Username: username,
+					Answer:   answerText.String,
+				})
+			}
+		}
+
+		if q.IsTest {
+			for i, ans := range q.Answers {
+				qa.AnswerStats = append(qa.AnswerStats, models.AnswerStat{
+					AnswerText: ans.Text,
+					Count:      answerCounts[i+1],
+					IsCorrect:  ans.Correct,
+				})
+			}
+			if totalResponses > 0 {
+				qa.CorrectRate = float64(correctAnswers) / float64(totalResponses) * 100
+			}
+		} else {
+			qa.TextResponses = textResponses
+		}
+
+		questionAnalytics = append(questionAnalytics, qa)
+	}
+
+	// Вычисляем средний балл
+	for _, p := range participants {
+		totalScoreSum += p.TotalBall
+	}
+	averageScore := 0.0
+	if totalResponses > 0 {
+		averageScore = float64(totalScoreSum) / float64(totalResponses)
+	}
+
+	return &models.SurveyAnalytics{
+		Survey:         survey,
+		Participants:   participants,
+		Questions:      questionAnalytics,
+		TotalResponses: totalResponses,
+		AverageScore:   averageScore,
+	}, nil
+}
+
+
 
 type Executor interface {
 	Exec(query string, args ...interface{}) (sql.Result, error)

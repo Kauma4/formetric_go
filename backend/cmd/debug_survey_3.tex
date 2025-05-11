@@ -1,0 +1,73 @@
+\documentclass[a4paper,12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[russian]{babel}
+\usepackage{geometry}
+\geometry{margin=2cm}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{amsmath}
+\begin{document}
+
+% Заголовок
+\begin{center}
+    \textbf{\Large Аналитика опроса: dsfsdfdsf}
+\end{center}
+\vspace{0.5cm}
+
+% Общая информация
+\section*{Общая информация}
+\begin{tabular}{ll}
+    \toprule
+    Название: & dsfsdfdsf \\
+    Описание: & sdsdsdsad \\
+    Создан: & 07.05.2025 \\
+    Максимальный балл: & 3 \\
+    Количество ответов: & 2 \\
+    Средний балл: & 2.00 \\
+    \bottomrule
+\end{tabular}
+
+% Участники
+\section*{Участники}
+\begin{longtable}{llrr}
+    \toprule
+    Имя пользователя & Дата & Баллы & \% от максимума \\
+    \midrule
+    vova229 & 07.05.2025 15:37 & 2 & 66.67\% \\
+    vova228 & 07.05.2025 15:02 & 2 & 66.67\% \\
+    \bottomrule
+\end{longtable}
+
+% Вопросы
+\section*{Статистика по вопросам}
+
+\subsection*{Вопрос 1: asdasdasd}
+\textbf{Тип:} test \\
+\textbf{Баллы за вопрос:} 2 \\
+\textbf{Правильный ответ:} sadasdsd \\
+\textbf{Процент правильных ответов:} 100.00\% \\
+
+\begin{tabular}{lrr}
+    \toprule
+    Вариант ответа & Количество & Правильный \\
+    \midrule
+    sadasdsd & 2 & true \\
+    sadasdasd & 0 & false \\
+    \bottomrule
+\end{tabular}
+
+\subsection*{Вопрос 2: sadsadsadsadsa}
+\textbf{Тип:} text_info \\
+\textbf{Баллы за вопрос:} 1 \\
+\textbf{Текстовые ответы:} \\
+
+\begin{longtable}{ll}
+    \toprule
+    Пользователь & Ответ \\
+    \midrule
+    vova228 & sdsadsd \\
+    vova229 & sdasd \\
+    \bottomrule
+\end{longtable}
+
+\end{document}

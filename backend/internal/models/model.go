@@ -15,6 +15,32 @@ type User struct {
     Location    sql.NullString   `json:"location"`
 }
 
+// RegisterUserInput используется для обработки входных данных при регистрации
+type RegisterUserInput struct {
+	Username    string `json:"username" binding:"required"`
+	Password    string `json:"password" binding:"required"`
+	Email       string `json:"email,omitempty"`
+	FullName    string `json:"full_name,omitempty"`
+	AvatarURL   string `json:"avatar_url,omitempty"`
+	PhoneNumber string `json:"phone_number,omitempty"`
+	DateOfBirth string `json:"date_of_birth,omitempty"`
+	Location    string `json:"location,omitempty"`
+}
+
+// ToUser преобразует RegisterUserInput в User
+func (input *RegisterUserInput) ToUser() User {
+	return User{
+		Username:    input.Username,
+		Password:    input.Password,
+		Email:       sql.NullString{String: input.Email, Valid: input.Email != ""},
+		FullName:    sql.NullString{String: input.FullName, Valid: input.FullName != ""},
+		AvatarURL:   sql.NullString{String: input.AvatarURL, Valid: input.AvatarURL != ""},
+		PhoneNumber: sql.NullString{String: input.PhoneNumber, Valid: input.PhoneNumber != ""},
+		DateOfBirth: sql.NullString{String: input.DateOfBirth, Valid: input.DateOfBirth != ""},
+		Location:    sql.NullString{String: input.Location, Valid: input.Location != ""},
+	}
+}
+
 type ParticipantResult struct {
     UserID    int       `json:"user_id"`
     Username  string    `json:"username"`
@@ -30,6 +56,7 @@ type Survey struct {
     IsPrivate   bool   `json:"is_private"` 
     CreatedBy   int    `json:"created_by"`
     CreatedAt   time.Time `json:"created_at"`
+    MaxBall     int       `json:"max_ball"`
 }
 
 type SurveyResult struct {
@@ -82,8 +109,39 @@ type AnswersRequest struct {
 type UserAnswerSimple struct {
     QuestionText   string `json:"question_text"`
     UserAnswer     string `json:"user_answer"`
-    CorrectAnswer  string `json:"correct_answer,omitempty"` // Добавляем для всех типов вопросов
-    IsCorrect      *bool  `json:"is_correct,omitempty"`     // Только для тестовых вопросов
+    CorrectAnswer  string `json:"correct_answer,omitempty"`
+    IsCorrect      *bool  `json:"is_correct,omitempty"`
+}
+
+
+// SurveyAnalytics содержит полную аналитику по опросу
+type SurveyAnalytics struct {
+	Survey        Survey                    `json:"survey"`
+	Participants  []ParticipantResult       `json:"participants"`
+	Questions     []QuestionAnalytics       `json:"questions"`
+	TotalResponses int                      `json:"total_responses"`
+	AverageScore   float64                  `json:"average_score"`
+}
+
+// QuestionAnalytics содержит статистику по конкретному вопросу
+type QuestionAnalytics struct {
+	Question       Question                 `json:"question"`
+	AnswerStats    []AnswerStat             `json:"answer_stats"` // Для тестовых вопросов
+	TextResponses  []TextResponse           `json:"text_responses"` // Для текстовых вопросов
+	CorrectRate    float64                  `json:"correct_rate"` // % правильных ответов (для тестовых)
+}
+
+// AnswerStat статистика по вариантам ответов тестового вопроса
+type AnswerStat struct {
+	AnswerText string `json:"answer_text"`
+	Count      int    `json:"count"`
+	IsCorrect  bool   `json:"is_correct"`
+}
+
+// TextResponse текстовый ответ пользователя
+type TextResponse struct {
+	Username string `json:"username"`
+	Answer   string `json:"answer"`
 }
 
 

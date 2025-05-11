@@ -6,6 +6,7 @@ import (
     "log"
     "net/http"
     "my-auth-app/internal/models"
+    "my-auth-app/internal/utils"
     "my-auth-app/internal/database"
     "github.com/gin-gonic/gin"
 )
@@ -20,7 +21,7 @@ func updateSurvey(db *sql.DB) gin.HandlerFunc {
         }
 
         // Получаем текущего пользователя
-        userID, err := getUserIDFromToken(c)
+        userID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
             return

@@ -3,11 +3,11 @@ package handlers
 import (
     "database/sql"
     "log"
-   // "encoding/json"
     "strconv"
     "net/http"
     "my-auth-app/internal/models"
     "my-auth-app/internal/database"
+    "my-auth-app/internal/utils"
     "github.com/gin-gonic/gin"
 )
 
@@ -15,7 +15,7 @@ import (
 func createAnswerUser(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
         // Получаем ID пользователя из токена
-        userID, err := getUserIDFromToken(c)
+        userID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             log.Printf("Auth error: %v", err)
             c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
@@ -140,7 +140,7 @@ func createAnswerUser(db *sql.DB) gin.HandlerFunc {
 
 func getUserSimpleSurveyAnswers(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
-        userID, err := getUserIDFromToken(c)
+        userID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
             return
@@ -171,7 +171,7 @@ func getUserSimpleSurveyAnswers(db *sql.DB) gin.HandlerFunc {
 func getUserAnswersByID(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
         // Проверяем токен для авторизации (ID создателя опроса)
-        creatorID, err := getUserIDFromToken(c)
+        creatorID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
             return
