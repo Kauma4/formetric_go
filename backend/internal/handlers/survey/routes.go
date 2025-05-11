@@ -5,6 +5,9 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+
+
+
 // RegisterSurveyRoutes регистрирует маршруты для опросов
 func RegisterSurveyRoutes(r *gin.Engine, db *sql.DB) {
 	// Группа маршрутов с префиксом /surveys

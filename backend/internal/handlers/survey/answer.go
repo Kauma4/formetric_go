@@ -146,7 +146,7 @@ func getUserSimpleSurveyAnswers(db *sql.DB) gin.HandlerFunc {
             return
         }
 
-        surveyIDStr := c.Param("survey_id")
+        surveyIDStr := c.Param("id")
         surveyID, err := strconv.Atoi(surveyIDStr)
         if err != nil {
             c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный ID опроса"})
@@ -178,7 +178,7 @@ func getUserAnswersByID(db *sql.DB) gin.HandlerFunc {
         }
 
         // Получаем survey_id из параметров URL
-        surveyIDStr := c.Param("survey_id")
+        surveyIDStr := c.Param("id")
         surveyID, err := strconv.Atoi(surveyIDStr)
         if err != nil {
             c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный ID опроса"})

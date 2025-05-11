@@ -116,7 +116,7 @@ func createQuestion(db *sql.DB) gin.HandlerFunc {
 
 func getQuestions(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
-        surveyIDStr := c.Param("survey_id")
+        surveyIDStr := c.Param("id")
         surveyID, err := strconv.Atoi(surveyIDStr)
         if err != nil {
             c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный формат ID опроса"})

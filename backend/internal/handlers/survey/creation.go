@@ -87,7 +87,7 @@ func getUserSurveys(db *sql.DB) gin.HandlerFunc {
 func getSurveyParticipants(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
         // Получаем ID опроса
-        surveyID, err := strconv.Atoi(c.Param("survey_id"))
+        surveyID, err := strconv.Atoi(c.Param("id"))
         if err != nil {
             c.JSON(http.StatusBadRequest, gin.H{"error": "Неверный ID опроса"})
             return
