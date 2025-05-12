@@ -53,7 +53,6 @@ func GetUserSimpleSurveyAnswers(db *sql.DB, userID, surveyID int) ([]models.User
                 return nil, err
             }
             
-            // Собираем все правильные ответы
             var correctAnswers []string
             for _, ans := range qAnswers {
                 if ans.Correct {
@@ -62,7 +61,6 @@ func GetUserSimpleSurveyAnswers(db *sql.DB, userID, surveyID int) ([]models.User
             }
             a.CorrectAnswer = strings.Join(correctAnswers, ", ")
 
-            // Обработка ответа пользователя
             if answerID > 0 && answerID <= len(qAnswers) {
                 a.UserAnswer = qAnswers[answerID-1].Text
                 isCorrect := qAnswers[answerID-1].Correct
