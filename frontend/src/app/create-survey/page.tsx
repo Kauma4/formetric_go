@@ -220,24 +220,32 @@ export default function CreateSurveyPage() {
       const surveyId = surveyData.survey_id
 
       for (const question of questions) {
-        const questionData = {
-          survey_id: surveyId,
-          question_text: question.text,
-          ball: question.ball,
-          type: question.type,
-          required: question.required,
-          multiple_answers: question.multipleAnswers,
-          is_test: question.type === 'test',
-          answers: question.type === 'test' ? question.answers.map(a => ({
-            text: a.text,
-            correct: a.isCorrect
-          })) : undefined,
-          correct_answer: question.type === 'text' 
-            ? question.answers[0]?.text 
-            : question.type === 'free_text' 
-              ? null 
-              : undefined
-        }
+    const questionData: any = {
+  survey_id: surveyId,
+  question_text: question.text,
+  ball: question.ball,
+  required: question.required,
+  is_test: question.type === 'test',
+  multiple_answers: question.multipleAnswers,
+  answers: [],
+  correct_answer: "",
+}
+
+if (question.type === 'test') {
+  questionData.answers = question.answers.map(a => ({
+    text: a.text,
+    correct: a.isCorrect
+  }))
+}
+
+if (question.type === 'text') {
+  questionData.correct_answer = question.answers[0]?.text || ""
+}
+
+if (question.type === 'free_text') {
+  questionData.correct_answer = ""
+}
+
 
         const questionResponse = await fetch("http://localhost:8080/question", {
           method: "POST",

@@ -39,7 +39,6 @@ export default function MySurveys() {
         }
 
         const data = await response.json()
-        // Устанавливаем surveys как пустой массив, если data.surveys отсутствует или null
         setSurveys(Array.isArray(data.surveys) ? data.surveys : [])
       } catch (error) {
         toast({
@@ -54,6 +53,40 @@ export default function MySurveys() {
 
     fetchSurveys()
   }, [router, toast])
+
+  const downloadSurveyPdf = async (surveyId: number) => {
+    try {
+      const token = localStorage.getItem("token")
+      if (!token) throw new Error("Вы не авторизованы")
+
+      const response = await fetch(`http://localhost:8080/surveys/${surveyId}/analytics/pdf`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error("Не удалось скачать PDF")
+      }
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+
+      const a = document.createElement("a")
+      a.href = url
+      a.download = `survey_${surveyId}_analytics.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      toast({
+        title: "Ошибка",
+        description: error instanceof Error ? error.message : "Ошибка скачивания PDF",
+        variant: "destructive",
+      })
+    }
+  }
 
   if (isLoading) {
     return (
@@ -83,10 +116,9 @@ export default function MySurveys() {
             {surveys.map(survey => (
               <Card 
                 key={survey.id}
-                className="cursor-pointer hover:bg-gray-50"
-                onClick={() => router.push(`/my-surveys/${survey.id}`)}
+                className="group cursor-pointer hover:bg-gray-50"
               >
-                <CardHeader>
+                <CardHeader onClick={() => router.push(`/my-surveys/${survey.id}`)}>
                   <CardTitle>{survey.title}</CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -94,6 +126,16 @@ export default function MySurveys() {
                   <p className="text-sm text-gray-500 mt-2">
                     Создан: {new Date(survey.created_at).toLocaleDateString()}
                   </p>
+                  <Button
+                    variant="secondary"
+                    className="mt-4"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      downloadSurveyPdf(survey.id)
+                    }}
+                  >
+                    Скачать PDF
+                  </Button>
                 </CardContent>
               </Card>
             ))}
