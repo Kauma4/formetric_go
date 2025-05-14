@@ -127,7 +127,7 @@ func getSurveyAnalyticsPDF(db *sql.DB) gin.HandlerFunc {
 
 // compileHTMLToPDF отправляет HTML-код в DocRaptor API и получает PDF
 func compileHTMLToPDF(htmlContent string) ([]byte, error) {
-	const apiKey = "o12_26jojjnlbbjXF01E" // Замените на ваш API-ключ DocRaptor
+	const apiKey = "o12_26jojjnlbbjXF01E"
 	urlStr := "https://api.docraptor.com/docs"
 	payload := bytes.NewBufferString(fmt.Sprintf(`{
 		"test": true,
@@ -158,6 +158,8 @@ func compileHTMLToPDF(htmlContent string) ([]byte, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "ошибка чтения ответа")
 	}
+	// debug
+	/* 
 	debugFile := fmt.Sprintf("debug_docraptor_response_%d.txt", time.Now().Unix())
 	if err := os.WriteFile(debugFile, body, 0644); err != nil {
 		log.Printf("Ошибка сохранения ответа DocRaptor в %s: %v", debugFile, err)
@@ -165,6 +167,7 @@ func compileHTMLToPDF(htmlContent string) ([]byte, error) {
 		log.Printf("Ответ DocRaptor сохранён в %s", debugFile)
 	}
 
+	*/ 
 	if resp.StatusCode != http.StatusOK {
 		return nil, errors.Errorf("DocRaptor вернул ошибку: %s, тело: %s", resp.Status, string(body))
 	}

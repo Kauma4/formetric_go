@@ -32,7 +32,7 @@ interface UserAnswer {
 }
 
 export default function SurveyParticipants() {
-  const { id } = useParams()
+  const { id } = useParams<{ id: string }>()
   const router = useRouter()
   const { toast } = useToast()
   const [participants, setParticipants] = useState<Participant[]>([])
@@ -65,13 +65,14 @@ export default function SurveyParticipants() {
         }
 
         const data = await response.json()
-        setParticipants(data.participants)
+        setParticipants(data.participants || [])
       } catch (error) {
         toast({
           title: "Ошибка",
           description: error instanceof Error ? error.message : "Неизвестная ошибка",
           variant: "destructive",
         })
+        setParticipants([])
       } finally {
         setIsLoading(false)
       }
@@ -84,9 +85,7 @@ export default function SurveyParticipants() {
     setIsLoadingAnswers(true)
     try {
       const token = localStorage.getItem("token")
-      if (!token) {
-        throw new Error("Требуется авторизация")
-      }
+      if (!token) throw new Error("Требуется авторизация")
 
       const response = await fetch(
         `http://localhost:8080/survey/${id}/answers/user`,
@@ -106,13 +105,14 @@ export default function SurveyParticipants() {
       }
 
       const data = await response.json()
-      setUserAnswers(data.answers)
+      setUserAnswers(data.answers || [])
     } catch (error) {
       toast({
         title: "Ошибка",
         description: error instanceof Error ? error.message : "Неизвестная ошибка",
         variant: "destructive",
       })
+      setUserAnswers([])
     } finally {
       setIsLoadingAnswers(false)
     }
@@ -125,11 +125,16 @@ export default function SurveyParticipants() {
   }
 
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), "dd MMM yyyy, HH:mm", { locale: ru })
+    try {
+      return format(new Date(dateString), "dd MMM yyyy, HH:mm", { locale: ru })
+    } catch {
+      return "Неверная дата"
+    }
   }
 
   const calculatePercentage = (score: number, max: number) => {
-    return max > 0 ? ((score / max) * 100).toFixed(1) : 0
+    if (max <= 0) return "0.0"
+    return ((score / max) * 100).toFixed(1)
   }
 
   return (
@@ -185,7 +190,9 @@ export default function SurveyParticipants() {
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogContent className="max-w-2xl">
             <DialogHeader>
-              <DialogTitle>Ответы пользователя</DialogTitle>
+              <DialogTitle>
+                Ответы пользователя {participants.find(p => p.user_id === selectedUser)?.username || ""}
+              </DialogTitle>
             </DialogHeader>
             <div className="max-h-[60vh] overflow-y-auto">
               {isLoadingAnswers ? (
@@ -201,17 +208,20 @@ export default function SurveyParticipants() {
                   {userAnswers.map((answer, index) => (
                     <div key={index} className="border-b pb-4">
                       <div className="font-medium mb-2">{answer.question_text}</div>
-                      
-                      <div className="space-y科技-2">
+                      <div className="space-y-2">
                         <div className="flex justify-between">
                           <span className="text-muted-foreground">Ответ:</span>
-                          <span className="font-medium">{answer.user_answer || "Нет ответа"}</span>
+                          <span className="font-medium">
+                            {answer.user_answer || "Нет ответа"}
+                          </span>
                         </div>
                         
                         {answer.correct_answer && (
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Правильный ответ:</span>
-                            <span className="text-green-600">{answer.correct_answer}</span>
+                            <span className="text-green-600">
+                              {answer.correct_answer}
+                            </span>
                           </div>
                         )}
                         

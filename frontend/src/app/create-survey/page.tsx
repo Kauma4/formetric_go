@@ -21,7 +21,7 @@ interface QuestionForm {
   text: string
   ball: number
   type: 'test' | 'text' | 'free_text'
-  required: boolean
+  is_required: boolean
   multipleAnswers: boolean
   answers: AnswerForm[]
   hasCorrectAnswer: boolean
@@ -38,7 +38,7 @@ export default function CreateSurveyPage() {
       text: "", 
       ball: 0, 
       type: "test",
-      required: true,
+      is_required: true,
       multipleAnswers: false,
       hasCorrectAnswer: true,
       answers: [{ text: "", isCorrect: true }] 
@@ -59,13 +59,14 @@ export default function CreateSurveyPage() {
   }, [router, toast])
 
   const handleAddQuestion = () => {
+    console.log("Adding new question")
     setQuestions([
       ...questions, 
       { 
         text: "", 
         ball: 1, 
         type: "test",
-        required: true,
+        is_required: true,
         multipleAnswers: false,
         hasCorrectAnswer: true,
         answers: [{ text: "", isCorrect: true }] 
@@ -75,6 +76,7 @@ export default function CreateSurveyPage() {
 
   const handleRemoveQuestion = (index: number) => {
     if (questions.length > 1) {
+      console.log(`Removing question at index ${index}`)
       const newQuestions = [...questions]
       newQuestions.splice(index, 1)
       setQuestions(newQuestions)
@@ -82,6 +84,7 @@ export default function CreateSurveyPage() {
   }
 
   const handleQuestionChange = (index: number, field: string, value: any) => {
+    console.log(`Changing question ${index}, field: ${field}, value: ${value}, type: ${typeof value}`)
     const updatedQuestions = [...questions]
     
     if (field === 'type') {
@@ -96,9 +99,11 @@ export default function CreateSurveyPage() {
     
     updatedQuestions[index] = { ...updatedQuestions[index], [field]: value }
     setQuestions(updatedQuestions)
+    console.log(`Updated questions state:`, JSON.stringify(updatedQuestions, null, 2))
   }
 
   const handleAddAnswer = (qIndex: number) => {
+    console.log(`Adding answer to question ${qIndex}`)
     const updatedQuestions = [...questions]
     updatedQuestions[qIndex].answers.push({ text: "", isCorrect: false })
     setQuestions(updatedQuestions)
@@ -106,6 +111,7 @@ export default function CreateSurveyPage() {
 
   const handleRemoveAnswer = (qIndex: number, aIndex: number) => {
     if (questions[qIndex].answers.length > 1) {
+      console.log(`Removing answer ${aIndex} from question ${qIndex}`)
       const updatedQuestions = [...questions]
       updatedQuestions[qIndex].answers.splice(aIndex, 1)
 
@@ -119,12 +125,14 @@ export default function CreateSurveyPage() {
   }
 
   const handleAnswerChange = (qIndex: number, aIndex: number, value: string) => {
+    console.log(`Changing answer ${aIndex} of question ${qIndex} to: ${value}`)
     const updatedQuestions = [...questions]
     updatedQuestions[qIndex].answers[aIndex].text = value
     setQuestions(updatedQuestions)
   }
 
   const handleSetCorrectAnswer = (qIndex: number, aIndex: number) => {
+    console.log(`Setting correct answer ${aIndex} for question ${qIndex}`)
     const updatedQuestions = [...questions]
     
     if (updatedQuestions[qIndex].multipleAnswers) {
@@ -142,6 +150,14 @@ export default function CreateSurveyPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+
+    console.log("Submitting survey form")
+    console.log("Current state:", {
+      title,
+      description,
+      isPrivate,
+      questions: JSON.stringify(questions, null, 2)
+    })
 
     if (!title.trim()) {
       toast({
@@ -198,6 +214,7 @@ export default function CreateSurveyPage() {
     const token = localStorage.getItem("token")
 
     try {
+      console.log("Creating survey with data:", { title, description, is_private: isPrivate })
       const surveyResponse = await fetch("http://localhost:8080/survey", {
         method: "POST",
         headers: {
@@ -220,32 +237,33 @@ export default function CreateSurveyPage() {
       const surveyId = surveyData.survey_id
 
       for (const question of questions) {
-    const questionData: any = {
-  survey_id: surveyId,
-  question_text: question.text,
-  ball: question.ball,
-  required: question.required,
-  is_test: question.type === 'test',
-  multiple_answers: question.multipleAnswers,
-  answers: [],
-  correct_answer: "",
-}
+        const questionData: any = {
+          survey_id: surveyId,
+          question_text: question.text,
+          ball: question.ball,
+          is_required: question.is_required,
+          multipleAnswers: question.multipleAnswers,
+          is_test: question.type === 'test',
+          answers: [],
+          correct_answer: "",
+        }
 
-if (question.type === 'test') {
-  questionData.answers = question.answers.map(a => ({
-    text: a.text,
-    correct: a.isCorrect
-  }))
-}
+        if (question.type === 'test') {
+          questionData.answers = question.answers.map(a => ({
+            text: a.text,
+            correct: a.isCorrect
+          }))
+        }
 
-if (question.type === 'text') {
-  questionData.correct_answer = question.answers[0]?.text || ""
-}
+        if (question.type === 'text') {
+          questionData.correct_answer = question.answers[0]?.text || ""
+        }
 
-if (question.type === 'free_text') {
-  questionData.correct_answer = ""
-}
+        if (question.type === 'free_text') {
+          questionData.correct_answer = ""
+        }
 
+        console.log(`Sending question data to server:`, JSON.stringify(questionData, null, 2))
 
         const questionResponse = await fetch("http://localhost:8080/question", {
           method: "POST",
@@ -256,8 +274,10 @@ if (question.type === 'free_text') {
           body: JSON.stringify(questionData)
         })
 
+        console.log(`Question response status: ${questionResponse.status}`)
         if (!questionResponse.ok) {
           const errorData = await questionResponse.json()
+          console.log(`Question error response:`, errorData)
           throw new Error(errorData.error || `Ошибка создания вопроса "${question.text}"`)
         }
       }
@@ -376,8 +396,8 @@ if (question.type === 'free_text') {
                               <Label htmlFor={`required-${qIndex}`}>Обязательность:</Label>
                               <select
                                 id={`required-${qIndex}`}
-                                value={question.required ? "required" : "optional"}
-                                onChange={(e) => handleQuestionChange(qIndex, "required", e.target.value === "required")}
+                                value={question.is_required ? "required" : "optional"}
+                                onChange={(e) => handleQuestionChange(qIndex, "is_required", e.target.value === "required")}
                                 className="rounded-md border border-input bg-background px-3 py-2 text-sm"
                               >
                                 <option value="required">Обязательный</option>
@@ -440,7 +460,7 @@ if (question.type === 'free_text') {
 
                           <div className="space-y-3">
                             {question.answers.map((answer, aIndex) => (
-                              <div key={aIndex} className="space-y-2">
+                              <div key={aIndex}>
                                 <div className="flex items-center space-x-2">
                                   {question.multipleAnswers ? (
                                     <input
@@ -507,7 +527,6 @@ if (question.type === 'free_text') {
                   </Card>
                 ))}
 
-                {/* Плавающая кнопка добавления вопроса */}
                 <div className="fixed bottom-6 right-6 z-50">
                   <Button 
                     type="button" 

@@ -57,6 +57,7 @@ func createTables(db *sql.DB) error {
         id SERIAL PRIMARY KEY,
         survey_id INTEGER NOT NULL,
         is_required BOOLEAN NOT NULL DEFAULT FALSE,
+        multipleAnswers BOOLEAN NOT NULL DEFAULT FALSE,
         is_test BOOLEAN NOT NULL DEFAULT FALSE,
         correct_answer TEXT,
         question_text TEXT NOT NULL,

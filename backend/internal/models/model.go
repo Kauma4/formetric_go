@@ -69,14 +69,21 @@ type Question struct {
     ID           int      `json:"id"`
     SurveyID     int      `json:"survey_id"`
 	IsRequired    bool     `json:"is_required"`
+    MultipleAnswers bool `json:"multipleAnswers"`
     IsTest        bool     `json:"is_test"`
     CorrectAnswer string   `json:"correct_answer,omitempty"`
     QuestionText string   `json:"question_text"`
     Ball         int      `json:"ball"`
     Answers      []Answer `json:"answers"`
 }
-
+/*
 type Answer struct {
+    Text    string `json:"text"`
+    Correct bool   `json:"correct"`
+}
+*/
+type Answer struct {
+    ID      int    `json:"id,omitempty"`
     Text    string `json:"text"`
     Correct bool   `json:"correct"`
 }

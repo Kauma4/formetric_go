@@ -10,27 +10,27 @@ import (
 )
 
 func CreateQuestion(db Executor, question *models.Question) error {
-	var answersJSON []byte
-	var err error
+    var answersJSON []byte
+    var err error
 
-	if question.IsTest {
-		answersJSON, err = json.Marshal(question.Answers)
-		if err != nil {
-			log.Printf("Answers marshaling error: %v", err)
-			return fmt.Errorf("ошибка сериализации ответов: %v", err)
-		}
-	} else {
-		answersJSON = []byte("[]")
-	}
+    if question.IsTest {
+        answersJSON, err = json.Marshal(question.Answers)
+        if err != nil {
+            log.Printf("Answers marshaling error: %v", err)
+            return fmt.Errorf("ошибка сериализации ответов: %v", err)
+        }
+    } else {
+        answersJSON = []byte("[]")
+    }
 
-	err = db.QueryRow(
-		`INSERT INTO questions (survey_id, question_text, is_required, is_test, 
-		correct_answer, ball, answers) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
-		question.SurveyID, question.QuestionText, question.IsRequired,
-		question.IsTest, question.CorrectAnswer, question.Ball, answersJSON,
-	).Scan(&question.ID)
+    err = db.QueryRow(
+        `INSERT INTO questions (survey_id, question_text, is_required, multipleAnswers, is_test, 
+        correct_answer, ball, answers) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+        question.SurveyID, question.QuestionText, question.IsRequired, question.MultipleAnswers,
+        question.IsTest, question.CorrectAnswer, question.Ball, answersJSON,
+    ).Scan(&question.ID)
 
-	return err
+    return err
 }
 
 func GetQuestions(db *sql.DB, surveyID int) ([]models.Question, error) {
@@ -41,6 +41,7 @@ func GetQuestions(db *sql.DB, surveyID int) ([]models.Question, error) {
             question_text, 
             ball, 
             is_required, 
+            multipleAnswers, 
             is_test, 
             correct_answer, 
             answers 
@@ -58,13 +59,14 @@ func GetQuestions(db *sql.DB, surveyID int) ([]models.Question, error) {
         var q models.Question
         var answersJSON []byte
         
-        // 2. Добавьте все поля в Scan
+        // Сканируем все поля, включая multipleAnswers
         err := rows.Scan(
             &q.ID,
             &q.SurveyID,
             &q.QuestionText,
             &q.Ball,
             &q.IsRequired,
+            &q.MultipleAnswers,
             &q.IsTest,
             &q.CorrectAnswer,
             &answersJSON,
@@ -74,7 +76,7 @@ func GetQuestions(db *sql.DB, surveyID int) ([]models.Question, error) {
             return nil, err
         }
         
-        // 3. Добавьте обработку answers
+        // Обработка answers
         if len(answersJSON) > 0 {
             if err := json.Unmarshal(answersJSON, &q.Answers); err != nil {
                 return nil, fmt.Errorf("failed to unmarshal answers: %v", err)

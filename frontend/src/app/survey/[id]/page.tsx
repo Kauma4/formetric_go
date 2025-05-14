@@ -24,7 +24,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 
 interface Answer {
   id: number
-  text: string 
+  text: string
   correct?: boolean
 }
 
@@ -33,6 +33,7 @@ interface Question {
   question_text: string
   is_test: boolean
   is_required: boolean
+  multipleAnswers: boolean
   answers: Answer[]
 }
 
@@ -48,6 +49,8 @@ export default function SurveyPage() {
 
   const form = useForm<any>({
     resolver: formSchema ? zodResolver(formSchema) : undefined,
+    mode: "onChange",
+    defaultValues: {},
   })
 
   useEffect(() => {
@@ -69,33 +72,28 @@ export default function SurveyPage() {
           headers: { Authorization: `Bearer ${token}` },
         })
 
-        if (!response.ok) throw new Error(`HTTP error ${response.status}`)
+        if (!response.ok) throw new Error(`HTTP ошибка ${response.status}`)
         
         const data = await response.json()
         
-        const processedQuestions = (data.questions || []).map((q: any) => {
-          // Явное преобразование типов для boolean полей
-          const isTest = Boolean(q.is_test)
-          const isRequired = Boolean(q.is_required)
-
-          return {
-            id: q.id,
-            question_text: q.question_text,
-            is_test: isTest,
-            is_required: isRequired,
-            answers: isTest 
-              ? (q.answers || []).map((a: any, index: number) => ({
-                  id: a.id || index + 1,
-                  text: a.text || a.answer_text || `Ответ ${index + 1}`,
-                  correct: a.correct || a.is_correct || false
-                }))
-              : []
-          }
-        })
+        const processedQuestions = (data.questions || []).map((q: any) => ({
+          id: q.id,
+          question_text: q.question_text,
+          is_test: Boolean(q.is_test),
+          is_required: Boolean(q.is_required),
+          multipleAnswers: Boolean(q.multipleAnswers),
+          answers: q.is_test
+            ? (q.answers || []).map((a: any, index: number) => ({
+                id: a.id || index + 1,
+                text: a.text || `Ответ ${index + 1}`,
+                correct: Boolean(a.correct),
+              }))
+            : [],
+        }))
 
         setQuestions(processedQuestions)
       } catch (error) {
-        console.error("Ошибка при загрузке вопросов:", error)
+        console.error("Ошибка загрузки вопросов:", error)
         toast({
           title: "Ошибка загрузки",
           description: "Не удалось загрузить вопросы опроса.",
@@ -117,15 +115,23 @@ export default function SurveyPage() {
 
       questions.forEach((q) => {
         if (q.is_test) {
-          schemaFields[`question_${q.id}`] = q.is_required 
-            ? z.string().min(1, "Пожалуйста, выберите ответ")
-            : z.string().optional()
+          if (q.multipleAnswers) {
+            schemaFields[`question_${q.id}`] = q.is_required
+              ? z.array(z.string()).min(1, "Выберите хотя бы один ответ")
+              : z.array(z.string()).optional()
+            defaultValues[`question_${q.id}`] = []
+          } else {
+            schemaFields[`question_${q.id}`] = q.is_required
+              ? z.string().min(1, "Выберите ответ")
+              : z.string().optional()
+            defaultValues[`question_${q.id}`] = ""
+          }
         } else {
-          schemaFields[`question_${q.id}`] = q.is_required 
-            ? z.string().min(1, "Пожалуйста, введите ответ")
+          schemaFields[`question_${q.id}`] = q.is_required
+            ? z.string().min(1, "Введите ответ")
             : z.string().optional()
+          defaultValues[`question_${q.id}`] = ""
         }
-        defaultValues[`question_${q.id}`] = ""
       })
 
       setFormSchema(z.object(schemaFields))
@@ -139,18 +145,32 @@ export default function SurveyPage() {
       const token = localStorage.getItem("token")
       if (!token) throw new Error("Токен авторизации не найден")
 
-      const answers = questions.map((question) => {
+      const answers: any[] = []
+      questions.forEach((question) => {
         const formKey = `question_${question.id}`
-        const value = data[formKey] || ''
+        const value = data[formKey] || (question.multipleAnswers ? [] : "")
 
-        return {
-          question_id: question.id,
-          ...(question.is_test 
-            ? { answer_id: parseInt(value, 10) }
-            : { answer_user: value }
-          )
+        if (question.is_test && question.multipleAnswers) {
+          value.forEach((answerId: string) => {
+            answers.push({
+              question_id: question.id,
+              answer_id: parseInt(answerId, 10),
+            })
+          })
+        } else if (question.is_test) {
+          answers.push({
+            question_id: question.id,
+            answer_id: parseInt(value, 10),
+          })
+        } else {
+          answers.push({
+            question_id: question.id,
+            answer_user: value,
+          })
         }
       })
+
+      console.log("Отправляемые ответы:", JSON.stringify({ answers }, null, 2))
 
       const response = await fetch("http://localhost:8080/option", {
         method: "POST",
@@ -168,15 +188,14 @@ export default function SurveyPage() {
 
       toast({
         title: "Успешно",
-        description: "Ваши ответы успешно отправлены.",
+        description: "Ответы отправлены.",
       })
 
-      //router.push("/surveys")
       router.push(`/survey/${surveyId}/results`)
     } catch (error) {
-      console.error("Ошибка при отправке ответов:", error)
+      console.error("Ошибка отправки ответов:", error)
       toast({
-        title: "Ошибка отправки",
+        title: "Ошибка",
         description: error instanceof Error ? error.message : "Не удалось отправить ответы",
         variant: "destructive",
       })
@@ -207,7 +226,7 @@ export default function SurveyPage() {
           </CardHeader>
           <CardContent>
             {questions.length === 0 ? (
-              <p className="text-center text-muted-foreground">В этом опросе нет вопросов</p>
+              <p className="text-center text-muted-foreground">В опросе нет вопросов</p>
             ) : (
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
@@ -227,26 +246,55 @@ export default function SurveyPage() {
                           <FormControl>
                             {question.is_test ? (
                               question.answers.length > 0 ? (
-                                <RadioGroup
-                                  onValueChange={field.onChange}
-                                  value={field.value}
-                                  className="space-y-2"
-                                >
-                                  {question.answers.map((answer) => (
-                                    <div key={answer.id} className="flex items-center space-x-2">
-                                      <RadioGroupItem
-                                        value={answer.id.toString()}
-                                        id={`answer-${answer.id}`}
-                                      />
-                                      <Label htmlFor={`answer-${answer.id}`} className="font-normal">
-                                        {answer.text}
-                                      </Label>
-                                    </div>
-                                  ))}
-                                </RadioGroup>
+                                question.multipleAnswers ? (
+                                  <div className="space-y-2">
+                                    {question.answers.map((answer) => (
+                                      <div key={answer.id} className="flex items-center space-x-2">
+                                        <input
+                                          type="checkbox"
+                                          id={`answer-${answer.id}`}
+                                          checked={field.value?.includes(answer.id.toString())}
+                                          onChange={(e) => {
+                                            const currentValue = Array.isArray(field.value) ? field.value : []
+                                            const answerId = answer.id.toString()
+                                            if (e.target.checked) {
+                                              field.onChange([...currentValue, answerId])
+                                            } else {
+                                              field.onChange(currentValue.filter((id: string) => id !== answerId))
+                                            }
+                                          }}
+                                          disabled={isSubmitting}
+                                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        />
+                                        <Label htmlFor={`answer-${answer.id}`} className="font-normal">
+                                          {answer.text}
+                                        </Label>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <RadioGroup
+                                    onValueChange={field.onChange}
+                                    value={field.value}
+                                    className="space-y-2"
+                                    disabled={isSubmitting}
+                                  >
+                                    {question.answers.map((answer) => (
+                                      <div key={answer.id} className="flex items-center space-x-2">
+                                        <RadioGroupItem
+                                          value={answer.id.toString()}
+                                          id={`answer-${answer.id}`}
+                                        />
+                                        <Label htmlFor={`answer-${answer.id}`} className="font-normal">
+                                          {answer.text}
+                                        </Label>
+                                      </div>
+                                    ))}
+                                  </RadioGroup>
+                                )
                               ) : (
                                 <p className="text-sm text-red-500">
-                                  Ошибка: для тестового вопроса отсутствуют варианты ответов
+                                  Ошибка: нет вариантов ответов для тестового вопроса
                                 </p>
                               )
                             ) : (
@@ -262,7 +310,11 @@ export default function SurveyPage() {
                       )}
                     />
                   ))}
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  <Button
+                    type="submit"
+                    className="w-full"
+                    disabled={isSubmitting || !form.formState.isValid}
+                  >
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />

@@ -46,11 +46,9 @@ func main() {
 		ginSwagger.URL("/docs/openapi.json"),
 	))
 
-	// Регистрация маршрутов
 	analyticsHandlers.RegisterAnalyticsRoutes(router, db)
 	authHandlers.RegisterRoutes(router, db)
 	surveyHandlers.RegisterSurveyRoutes(router, db)
 
-	// Запуск сервера
 	router.Run(":8080")
 }
