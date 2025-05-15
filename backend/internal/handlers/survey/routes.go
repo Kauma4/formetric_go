@@ -13,6 +13,7 @@ func RegisterSurveyRoutes(r *gin.Engine, db *sql.DB) {
 	// Группа маршрутов с префиксом /surveys
 	surveysGroup := r.Group("/surveys")
 	{
+		surveysGroup.GET("/public", getPublicSurveys(db))
 		surveysGroup.GET("/:id/questions", getQuestions(db))
 		surveysGroup.GET("", getSurveys(db))
 		surveysGroup.GET("/:id/participants", getSurveyParticipants(db))

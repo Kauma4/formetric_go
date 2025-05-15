@@ -45,6 +45,17 @@ func createSurvey(db *sql.DB) gin.HandlerFunc {
     }
 }
 
+func getPublicSurveys(db *sql.DB) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        surveys, err := database.GetPublicSurveys(db)
+        if err != nil {
+            c.JSON(http.StatusInternalServerError, gin.H{"error": "Не удалось получить опросы"})
+            return
+        }
+        c.JSON(http.StatusOK, surveys)
+    }
+}
+
 func getSurveys(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
         log.Println("Получен запрос на опросы")

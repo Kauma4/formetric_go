@@ -295,14 +295,12 @@ func getUserSimpleSurveyAnswers(db *sql.DB) gin.HandlerFunc {
 
 func getUserAnswersByID(db *sql.DB) gin.HandlerFunc {
     return func(c *gin.Context) {
-        // Проверяем токен для авторизации (ID создателя опроса)
         creatorID, err := utils.GetUserIDFromToken(c)
         if err != nil {
             c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
             return
         }
 
-        // Получаем survey_id из параметров URL
         surveyIDStr := c.Param("id")
         surveyID, err := strconv.Atoi(surveyIDStr)
         if err != nil {
@@ -310,7 +308,6 @@ func getUserAnswersByID(db *sql.DB) gin.HandlerFunc {
             return
         }
 
-        // Получаем user_id из тела запроса
         var requestBody struct {
             UserID int `json:"user_id"`
         }
@@ -319,7 +316,6 @@ func getUserAnswersByID(db *sql.DB) gin.HandlerFunc {
             return
         }
 
-        // Проверяем, что опрос принадлежит создателю
         var creator int
         err = db.QueryRow("SELECT created_by FROM surveys WHERE id = $1", surveyID).Scan(&creator)
         if err == sql.ErrNoRows {

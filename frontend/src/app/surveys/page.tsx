@@ -41,7 +41,7 @@ export default function SurveysPage() {
           return
         }
 
-        const response = await fetch("http://localhost:8080/surveys", {
+        const response = await fetch("http://localhost:8080/surveys/public", {
           headers: { Authorization: `Bearer ${token}` },
         })
 

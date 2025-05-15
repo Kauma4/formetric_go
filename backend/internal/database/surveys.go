@@ -20,8 +20,18 @@ func CreateSurvey(db *sql.DB, survey *models.Survey) error {
     return err
   }
 
-func GetSurveys(db *sql.DB) ([]models.Survey, error) {
-    rows, err := db.Query("SELECT id, title, description, created_by FROM surveys")
+func GetPublicSurveys(db *sql.DB) ([]models.Survey, error) {
+    rows, err := db.Query(`
+        SELECT 
+            id, 
+            title, 
+            description, 
+            is_private, 
+            created_by,
+            created_at,
+            max_ball
+        FROM surveys
+        WHERE is_private = FALSE`)
     if err != nil {
         return nil, err
     }
@@ -30,7 +40,54 @@ func GetSurveys(db *sql.DB) ([]models.Survey, error) {
     var surveys []models.Survey
     for rows.Next() {
         var s models.Survey
-        if err := rows.Scan(&s.ID, &s.Title, &s.Description, &s.CreatedBy); err != nil {
+        err := rows.Scan(
+            &s.ID,
+            &s.Title,
+            &s.Description,
+            &s.IsPrivate,
+            &s.CreatedBy,
+            &s.CreatedAt,
+            &s.MaxBall,
+        )
+        if err != nil {
+            return nil, err
+        }
+        surveys = append(surveys, s)
+    }
+    return surveys, nil
+}
+
+
+func GetSurveys(db *sql.DB) ([]models.Survey, error) {
+    rows, err := db.Query(`
+        SELECT 
+            id, 
+            title, 
+            description, 
+            is_private, 
+            created_by,
+            created_at,
+            max_ball
+        FROM surveys
+    `)
+    if err != nil {
+        return nil, err
+    }
+    defer rows.Close()
+
+    var surveys []models.Survey
+    for rows.Next() {
+        var s models.Survey
+        err := rows.Scan(
+            &s.ID,
+            &s.Title,
+            &s.Description,
+            &s.IsPrivate,
+            &s.CreatedBy,
+            &s.CreatedAt,
+            &s.MaxBall,
+        )
+        if err != nil {
             return nil, err
         }
         surveys = append(surveys, s)

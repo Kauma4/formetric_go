@@ -26,29 +26,31 @@ export function MainNav() {
 
   const routes = [
     { href: "/", label: "Главная", showWhenLoggedOut: true },
-    { href: "/surveys", label: "Опросы", showAlways: true },
-    { href: "/my-surveys", label: "Мои опросы", showWhenLoggedIn: true }, // Добавлено
+   // { href: "/surveys", label: "Опросы", showWhenLoggedIn: true },
+    { href: "/my-surveys", label: "Мои опросы", showWhenLoggedIn: true }, 
     { href: "/create-survey", label: "Создать опрос", showWhenLoggedIn: true },
-    { href: "/analytics", label: "Аналитика", showWhenLoggedIn: true },
+    //{ href: "/analytics", label: "Аналитика", showWhenLoggedIn: true },
     { href: "/account", label: "Личный кабинет", showWhenLoggedIn: true },
     { href: "/login", label: "Вход", showWhenLoggedOut: true },
     { href: "/register", label: "Регистрация", showWhenLoggedOut: true },
   ]
 
   const filteredRoutes = routes.filter((route) => {
-    if (route.showAlways) return true
+   // if (route.showAlways) return true
     if (route.showWhenLoggedIn && isLoggedIn) return true
     if (route.showWhenLoggedOut && !isLoggedIn) return true
     return false
   })
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+   <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center">
         <div className="mr-4 hidden md:flex">
-          <Link href="/" className="mr-6 flex items-center space-x-2">
-            <span className="font-bold">Опросы</span>
-          </Link>
+          {isLoggedIn && ( // Добавлено условие
+            <Link href="/surveys" className="mr-6 flex items-center space-x-2">
+              <span className="font-bold">Опросы</span>
+            </Link>
+          )}
           <nav className="flex items-center space-x-6 text-sm font-medium">
             {filteredRoutes.map((route) => (
               <Link
@@ -71,9 +73,15 @@ export function MainNav() {
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="pr-0">
-            <Link href="/" className="flex items-center" onClick={() => setIsOpen(false)}>
-              <span className="font-bold">Опросы</span>
-            </Link>
+            {isLoggedIn && ( // Добавлено условие
+              <Link 
+                href="/surveys" 
+                className="flex items-center" 
+                onClick={() => setIsOpen(false)}
+              >
+                <span className="font-bold">Опросы</span>
+              </Link>
+            )}
             <nav className="mt-6 flex flex-col space-y-4">
               {filteredRoutes.map((route) => (
                 <Link
