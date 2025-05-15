@@ -33,6 +33,19 @@ func GenerateJWT(userID int, username string) (string, error) {
     return tokenString, nil
 }
 
+func GenerateJWTWithExpiration(userID int, username string, expiresAt time.Time) (string, error) {
+    if len(jwtSecret) == 0 {
+        return "", errors.New("JWT_SECRET не задано")
+    }
+    claims := jwt.MapClaims{
+        "user_id":  userID,
+        "username": username,
+        "exp":      expiresAt.Unix(),
+    }
+    token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+    return token.SignedString(jwtSecret)
+}
+
 func ExtractUserIDFromJWT(tokenString string) (int, error) {
     token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
         return jwtSecret, nil

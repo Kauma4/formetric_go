@@ -170,7 +170,20 @@ export default function SurveyPage() {
         }
       })
 
-      console.log("Отправляемые ответы:", JSON.stringify({ answers }, null, 2))
+      console.log("Структура отправляемых данных:", {
+        answers: answers.map(answer => ({
+          type: answer.answer_user ? "текстовый ответ" : "тестовый ответ",
+          question_id: answer.question_id,
+          data: answer.answer_user || { answer_id: answer.answer_id },
+          required: questions.find(q => q.id === answer.question_id)?.is_required
+        }))
+      })
+
+      console.log("Raw JSON payload:", JSON.stringify(
+        { answers }, 
+        (key, value) => key === 'correct' ? undefined : value, // Исключаем поле correct
+        2
+      ))
 
       const response = await fetch("http://localhost:8080/option", {
         method: "POST",

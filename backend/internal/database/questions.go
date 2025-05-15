@@ -96,13 +96,14 @@ func GetQuestions(db *sql.DB, surveyID int) ([]models.Question, error) {
 func GetQuestionWithAnswers(db *sql.DB, questionID int) (*models.Question, error) {
     var q models.Question
     var answersJSON []byte
+    
     err := db.QueryRow(
         `SELECT id, survey_id, question_text, is_required, is_test, 
-        correct_answer, ball, answers FROM questions WHERE id = $1`,
+        multipleAnswers, correct_answer, ball, answers FROM questions WHERE id = $1`,
         questionID,
     ).Scan(
         &q.ID, &q.SurveyID, &q.QuestionText, &q.IsRequired,
-        &q.IsTest, &q.CorrectAnswer, &q.Ball, &answersJSON,
+        &q.IsTest, &q.MultipleAnswers, &q.CorrectAnswer, &q.Ball, &answersJSON,
     )
     if err != nil {
         return nil, err
@@ -113,7 +114,7 @@ func GetQuestionWithAnswers(db *sql.DB, questionID int) (*models.Question, error
     return &q, nil
 }
 
-// GetQuestionIDsForSurvey возвращает список ID вопросов опроса
+
 func GetQuestionIDsForSurvey(db *sql.DB, surveyID int) ([]int, error) {
     rows, err := db.Query("SELECT id FROM questions WHERE survey_id = $1", surveyID)
     if err != nil {

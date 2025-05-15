@@ -76,12 +76,7 @@ type Question struct {
     Ball         int      `json:"ball"`
     Answers      []Answer `json:"answers"`
 }
-/*
-type Answer struct {
-    Text    string `json:"text"`
-    Correct bool   `json:"correct"`
-}
-*/
+
 type Answer struct {
     ID      int    `json:"id,omitempty"`
     Text    string `json:"text"`
@@ -92,8 +87,8 @@ type AnswerUser struct {
 	ID         int `json:"id"`
 	UserID     int `json:"user_id"`
 	QuestionID int `json:"question_id"`
-	AnswerID   int `json:"answer_id"`
-	AnswerText string `json:"answer_user"`
+	AnswerID   int    `json:"answer_id"`    // Указатель для nullable
+    AnswerText string `json:"answer_user"`  // Указатель для nullable
 }
 
 type Result struct {
@@ -112,14 +107,24 @@ type ExtendedResult struct {
 type AnswersRequest struct {
     Answers []AnswerUser `json:"answers"`
 }
-
+/*
 type UserAnswerSimple struct {
     QuestionText   string `json:"question_text"`
     UserAnswer     string `json:"user_answer"`
     CorrectAnswer  string `json:"correct_answer,omitempty"`
     IsCorrect      *bool  `json:"is_correct,omitempty"`
 }
+*/
 
+type UserAnswerSimple struct {
+    QuestionText      string   `json:"question_text"`
+    CorrectAnswer     string   `json:"correct_answer"`
+    UserAnswer        string   `json:"user_answer,omitempty"`    // omitempty для избежания null
+    UserAnswers       []string `json:"user_answers,omitempty"` 
+    IsCorrect         *bool    `json:"is_correct,omitempty"`
+    IsCorrectMultiple []bool   `json:"is_correct_multiple,omitempty"`
+    IsTest            bool     `json:"is_test"`
+}
 
 // SurveyAnalytics содержит полную аналитику по опросу
 type SurveyAnalytics struct {
